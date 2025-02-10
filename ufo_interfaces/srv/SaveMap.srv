@@ -1,0 +1,7 @@
+# Save the map to file
+
+# Name of the file
+string filename
+---
+# If it was successful
+bool success

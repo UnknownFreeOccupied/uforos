@@ -1,0 +1,7 @@
+# Get the complete map at a specified depth
+
+---
+# If it was successful
+bool success
+# The map to be returned
+ufo_interfaces/Map map

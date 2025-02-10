@@ -1,0 +1,9 @@
+# Clears the map.
+
+# The leaf node length of the new map
+float64 leaf_node_length
+# The number of depth levels in the new map
+uint8 num_depth_levels
+---
+# If it was successful
+bool success
