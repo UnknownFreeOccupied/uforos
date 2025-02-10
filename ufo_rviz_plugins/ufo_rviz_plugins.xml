@@ -1,0 +1,5 @@
+<library path="plan_display">
+  <class type="ufo_rviz_plugins::PlanDisplay" base_class_type="rviz_common::Display">
+    <description></description>
+  </class>
+</library>
