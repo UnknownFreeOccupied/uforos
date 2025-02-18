@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>ufo_mapping</name>
+  <version>1.0.0</version>
+  <description>The ufo_mapping package</description>
+
+  <author email="ramonaha@kth.se">Ramona Häuselmann</author>
+  <maintainer email="ramonaha@kth.se">Ramona Häuselmann</maintainer>
+
+  <license>BSD</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>roscpp</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
+  <depend>visualization_msgs</depend>
+  <depend>tf2_sensor_msgs</depend>
+
+  <depend>ufo</depend>
+  <depend>ufo_msgs</depend>
+  <depend>ufo_ros</depend>
+</package>

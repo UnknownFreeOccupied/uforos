@@ -1,0 +1,14 @@
+<?xml version="1.0" ?>
+<launch>
+	<arg name="resolution" default="0.05" />
+	<arg name="depth_levels" default="17" />
+	<arg name="frame_id" default="map" />
+
+  <node pkg="ufo_mapping" type="ufomapping_server_node" name="ufomapping_server_node" output="screen" required="true">
+		<param name="map_resolution_m" value="$(arg resolution)" />
+		<param name="map_depth_levels" value="$(arg depth_levels)" />
+		<param name="map_frame_id" value="$(arg frame_id)" />
+        <!-- <remap from="cloud_in" to="/kitti/velo/pointcloud" /> -->
+        <remap from="cloud_in" to="/camera/depth/points" />
+  </node>
+</launch>
