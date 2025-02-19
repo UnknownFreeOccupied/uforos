@@ -1,4 +1,4 @@
-#include <ufo_mapping/server.h>
+#include <ufo_mapping/server.hpp>
 
 // UFO
 #include <ufo/cloud/point_cloud.hpp>
@@ -6,7 +6,7 @@
 // UFOROS
 #include <ufo_msgs/Map.h>
 
-#include <ufo_ros/conversions.hpp>
+#include <ufo_ros/ufo_ros.hpp>
 
 // ROS
 #include <visualization_msgs/MarkerArray.h>
@@ -16,33 +16,33 @@ namespace ufo
 namespace mapping
 {
 
-Server::Server(ros::NodeHandle& nh, ros::NodeHandle& nh_priv)
-    : nh_(nh), nh_priv_(nh_priv), tf_listener_(tf_buffer_)
+Server::Server(ros::NodeHandle& nh, ros::NodeHandle& nh_priv) : tf_listener_(tf_buffer_)
 {
 	// ROS parameters
-	nh_priv_.getParam("map_resolution_m", map_resolution_);
-	nh_priv_.getParam("map_depth_levels", map_depthlevels_);
-	nh_priv_.getParam("map_frame_id", frame_id_);
+	nh_priv.getParam("map_resolution_m", map_resolution_);
+	nh_priv.getParam("map_depth_levels", map_depthlevels_);
+	nh_priv.getParam("map_frame_id", frame_id_);
 
 	map_ = new Map3D<OccupancyMap, ColorMap>(map_resolution_, map_depthlevels_);
 
 	// Subscribers
-	cloud_sub_ = nh_.subscribe("cloud_in", 10, &Server::cloudCallback, this);
+	insert_hits_sub_ = nh.subscribe("insert_hits", 10, &Server::insertHits, this);
+	insert_rays_sub_ = nh.subscribe("insert_rays", 10, &Server::insertRays, this);
 
 	// Publishers
-	map_pub_     = nh_priv_.advertise<ufo_msgs::Map>("map", 10);
+	map_pub_     = nh_priv.advertise<ufo_msgs::Map>("map", 10);
 	map_vis_pub_ = nh.advertise<visualization_msgs::MarkerArray>("map_vis", 10, true);
 }
 
-void Server::cloudCallback(sensor_msgs::PointCloud2::ConstPtr const& msg)
+void Server::insertHits(sensor_msgs::PointCloud2::ConstPtr const& msg)
 {
 	Transform3f transform;
 	try {
 		transform =
-		    ufo_ros::rosToUfo(tf_buffer_
-		                          .lookupTransform(frame_id_, msg->header.frame_id,
-		                                           msg->header.stamp, transform_timeout_)
-		                          .transform);
+		    ufo_ros::fromMsg(tf_buffer_
+		                         .lookupTransform(frame_id_, msg->header.frame_id,
+		                                          msg->header.stamp, transform_timeout_)
+		                         .transform);
 	} catch (tf2::TransformException& ex) {
 		ROS_WARN_THROTTLE(1, "%s", ex.what());
 		return;
@@ -50,16 +50,39 @@ void Server::cloudCallback(sensor_msgs::PointCloud2::ConstPtr const& msg)
 
 	PointCloud<3, float, Color> cloud;
 
-	ufo_ros::rosToUfo(*msg, cloud);
+	ufo_ros::fromMsg(*msg, cloud);
 
 	transformInPlace(execution::par, transform, cloud);
 
-	if (insert_rays_) {
-		// TODO: enable
-		// integrator_.insertRays(execution::par, *map_, cloud, transform.translation, false);
-	} else {
-		integrator_.insertPoints(execution::par, *map_, cloud, false);
+	integrator_.insertPoints(execution::par, *map_, cloud, false);
+
+	map_->propagateModified(execution::par);
+
+	publishMapVisualization(msg->header.stamp);
+}
+
+void Server::insertRays(sensor_msgs::PointCloud2::ConstPtr const& msg)
+{
+	Transform3f transform;
+	try {
+		transform =
+		    ufo_ros::fromMsg(tf_buffer_
+		                         .lookupTransform(frame_id_, msg->header.frame_id,
+		                                          msg->header.stamp, transform_timeout_)
+		                         .transform);
+	} catch (tf2::TransformException& ex) {
+		ROS_WARN_THROTTLE(1, "%s", ex.what());
+		return;
 	}
+
+	PointCloud<3, float, Color> cloud;
+
+	ufo_ros::fromMsg(*msg, cloud);
+
+	transformInPlace(execution::par, transform, cloud);
+
+	// TODO: enable
+	// integrator_.insertRays(execution::par, *map_, cloud, transform.translation, false);
 
 	map_->propagateModified(execution::par);
 
@@ -112,7 +135,7 @@ void Server::publishMapVisualization(ros::Time timestamp)
 			auto color  = map_->color(node);
 
 			geometry_msgs::Point point;
-			ufo_ros::ufoToRos(center, point);
+			ufo_ros::toMsg(center, point);
 			occupied_marker.points.push_back(point);
 
 			std_msgs::ColorRGBA c;

@@ -24,17 +24,15 @@ class Server
 	Server(ros::NodeHandle& nh, ros::NodeHandle& nh_priv);
 
  private:
-	void cloudCallback(sensor_msgs::PointCloud2::ConstPtr const& msg);
+	void insertHits(sensor_msgs::PointCloud2::ConstPtr const& msg);
+	void insertRays(sensor_msgs::PointCloud2::ConstPtr const& msg);
 	void publishMap(ros::Time timestamp);
 	void publishMapVisualization(ros::Time timestamp);
 
  private:
-	// Node handles
-	ros::NodeHandle& nh_;
-	ros::NodeHandle& nh_priv_;
-
 	// Subscribers
-	ros::Subscriber cloud_sub_;
+	ros::Subscriber insert_hits_sub_;
+	ros::Subscriber insert_rays_sub_;
 
 	// Publishers
 	ros::Publisher map_pub_;
@@ -49,7 +47,6 @@ class Server
 	ufo::Map3D<OccupancyMap, ColorMap>* map_;
 	ufo::Integrator                     integrator_;
 
-	bool  insert_rays_     = false;
 	float map_resolution_  = 0.05f;
 	int   map_depthlevels_ = 17;
 

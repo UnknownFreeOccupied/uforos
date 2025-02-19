@@ -13,6 +13,9 @@
 #include <ufo/math/transform3.hpp>
 #include <ufo/vision/color.hpp>
 
+// UFOROS
+#include <ufo_msgs/Map.h>
+
 // STL
 #include <optional>
 #include <string>
@@ -24,7 +27,7 @@ std::optional<sensor_msgs::PointField> getField(sensor_msgs::PointCloud2 const& 
 
 // Point clouds
 template <class... P>
-void rosToUfo(sensor_msgs::PointCloud2 const& cloud_in, ufo::Cloud<P...>& cloud_out,
+void fromMsg(sensor_msgs::PointCloud2 const& cloud_in, ufo::Cloud<P...>& cloud_out,
               bool filter_nan = true)
 {
 	if (0 == cloud_in.point_step || 0 == cloud_in.row_step || 0 == cloud_in.height) {
@@ -146,7 +149,7 @@ void rosToUfo(sensor_msgs::PointCloud2 const& cloud_in, ufo::Cloud<P...>& cloud_
 	cloud_out.resize(index);
 }
 
-constexpr ufo::Transform3f rosToUfo(geometry_msgs::Transform const& transform)
+constexpr ufo::Transform3f fromMsg(geometry_msgs::Transform const& transform)
 {
 	return {ufo::Quatf{static_cast<float>(transform.rotation.w),
 	                   static_cast<float>(transform.rotation.x),
@@ -157,7 +160,7 @@ constexpr ufo::Transform3f rosToUfo(geometry_msgs::Transform const& transform)
 	                   static_cast<float>(transform.translation.z)}};
 }
 
-constexpr ufo::Transform3f rosToUfo(geometry_msgs::Pose const& pose)
+constexpr ufo::Transform3f fromMsg(geometry_msgs::Pose const& pose)
 {
 	return {
 	    ufo::Quatf{
@@ -169,7 +172,7 @@ constexpr ufo::Transform3f rosToUfo(geometry_msgs::Pose const& pose)
 
 // Vector3/Point
 template <typename T>
-constexpr void rosToUfo(geometry_msgs::Point const& point_in, ufo::Vec3<T>& point_out)
+constexpr void fromMsg(geometry_msgs::Point const& point_in, ufo::Vec3<T>& point_out)
 {
 	point_out.x = point_in.x;
 	point_out.y = point_in.y;
@@ -177,25 +180,25 @@ constexpr void rosToUfo(geometry_msgs::Point const& point_in, ufo::Vec3<T>& poin
 }
 
 template <typename T>
-constexpr void rosToUfo(geometry_msgs::Vector3 const& point_in, ufo::Vec3<T>& point_out)
+constexpr void fromMsg(geometry_msgs::Vector3 const& point_in, ufo::Vec3<T>& point_out)
 {
 	point_out.x = point_in.x;
 	point_out.y = point_in.y;
 	point_out.z = point_in.z;
 }
 
-constexpr ufo::Vec3d rosToUfo(geometry_msgs::Point const& point)
+constexpr ufo::Vec3d fromMsg(geometry_msgs::Point const& point)
 {
 	return {point.x, point.y, point.z};
 }
 
-constexpr ufo::Vec3d rosToUfo(geometry_msgs::Vector3 const& point)
+constexpr ufo::Vec3d fromMsg(geometry_msgs::Vector3 const& point)
 {
 	return {point.x, point.y, point.z};
 }
 
 template <typename T>
-constexpr void ufoToRos(ufo::Vec3<T> const& point_in, geometry_msgs::Point& point_out)
+constexpr void toMsg(ufo::Vec3<T> const& point_in, geometry_msgs::Point& point_out)
 {
 	point_out.x = point_in.x;
 	point_out.y = point_in.y;
@@ -203,7 +206,7 @@ constexpr void ufoToRos(ufo::Vec3<T> const& point_in, geometry_msgs::Point& poin
 }
 
 template <typename T>
-constexpr void ufoToRos(ufo::Vec3<T> const& point_in, geometry_msgs::Vector3& point_out)
+constexpr void toMsg(ufo::Vec3<T> const& point_in, geometry_msgs::Vector3& point_out)
 {
 	point_out.x = point_in.x;
 	point_out.y = point_in.y;
@@ -211,12 +214,95 @@ constexpr void ufoToRos(ufo::Vec3<T> const& point_in, geometry_msgs::Vector3& po
 }
 
 template <typename P, typename T>
-constexpr P ufoToRos(ufo::Vec3<T> const& point)
+constexpr P toMsg(ufo::Vec3<T> const& point)
 {
 	P p;
-	ufoToRos(point, p);
+	toMsg(point, p);
 	return p;
 }
+
+
+// TODO: Implement below
+
+// //
+// // ROS message type to UFO type
+// //
+
+// // ufo::FileHeader msgToHeader(ufo_msgs::Map const& msg);
+
+// template <class Map>
+// void fromMsg(ufo_msgs::Map const& msg, Map& map, bool propagate = true)
+// {
+// 	if (msg.data.empty()) {
+// 		return;
+// 	}
+// 	ufo::Buffer buffer;
+// 	buffer.write(msg.data.data(),
+// 	             msg.data.size() * sizeof(decltype(ufo_msgs::Map::data)::value_type));
+// 	map.read(buffer, propagate);
+// }
+
+// //
+// // UFO type to ROS message type
+// //
+
+// template <class Map, class Predicates,
+//           typename = std::enable_if_t<!std::is_scalar_v<Predicates>>>
+// decltype(ufo_msgs::Map::data) toMsg(Map const& map, Predicates const& predicates,
+//                                       unsigned int depth = 0, bool compress = false,
+//                                       ufo::mt_t map_types                      = 0,
+//                                       int       compression_acceleration_level = 1,
+//                                       int       compression_level              = 0)
+// {
+// 	auto                         data = map.write(predicates, depth, compress, map_types,
+// 	                                              compression_acceleration_level, compression_level);
+// 	decltype(ufo_msgs::Map::data) ret;
+// 	ret.resize(data.size());
+// 	data.read(ret.data(), data.size());
+// 	return ret;
+// }
+
+// template <class Map>
+// decltype(ufo_msgs::Map::data) toMsg(Map const& map, unsigned int depth = 0,
+//                                       bool compress = false, ufo::mt_t map_types = 0,
+//                                       int compression_acceleration_level = 1,
+//                                       int compression_level              = 0)
+// {
+// 	auto data = map.write(depth, compress, map_types, compression_acceleration_level,
+// 	                      compression_level);
+// 	decltype(ufo_msgs::Map::data) ret;
+// 	ret.resize(data.size());
+// 	data.read(ret.data(), data.size());
+// 	return ret;
+// }
+
+// template <class Map>
+// decltype(ufo_msgs::Map::data) toMsgModified(Map& map, bool compress = false,
+//                                               ufo::mt_t map_types                = 0,
+//                                               int compression_acceleration_level = 1,
+//                                               int compression_level              = 0)
+// {
+// 	auto data = map.writeModified(compress, map_types, compression_acceleration_level,
+// 	                              compression_level);
+// 	decltype(ufo_msgs::Map::data) ret;
+// 	ret.resize(data.size());
+// 	data.read(ret.data(), data.size());
+// 	return ret;
+// }
+
+// template <class Map>
+// decltype(ufo_msgs::Map::data) toMsgResetModified(Map& map, bool compress = false,
+//                                                    ufo::mt_t map_types                = 0,
+//                                                    int compression_acceleration_level = 1,
+//                                                    int compression_level              = 0)
+// {
+// 	auto data = map.writeModifiedAndReset(
+// 	    compress, map_types, compression_acceleration_level, compression_level);
+// 	decltype(ufo_msgs::Map::data) ret;
+// 	ret.resize(data.size());
+// 	data.read(ret.data(), data.size());
+// 	return ret;
+// }
 
 }  // namespace ufo_ros
 

@@ -8,11 +8,6 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
 )
 
-find_package(UFO REQUIRED 
-  COMPONENTS 
-    Map 
-)
-
 add_message_files(
   FILES
   Map.msg
@@ -29,22 +24,6 @@ catkin_package(
  CATKIN_DEPENDS message_runtime std_msgs
 #  DEPENDS ufomap
 )
-
-include_directories(
-  include
-  ${catkin_INCLUDE_DIRS}
-)
-
-# add_library(${PROJECT_NAME} STATIC
-#   src/conversions.cpp
-# )
-
-# add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS} UFO::Map ${PROJECT_NAME}_generate_messages_cpp)
-# target_link_libraries(${PROJECT_NAME}
-#   PUBLIC
-#     ${catkin_LIBRARIES}
-#     UFO::Map
-# )
 
 # install(TARGETS ${PROJECT_NAME}
 #   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
