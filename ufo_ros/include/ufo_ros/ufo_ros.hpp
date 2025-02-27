@@ -7,6 +7,10 @@
 #include <ufo/math/transform.hpp>
 #include <ufo/vision/color.hpp>
 
+// UFO ROS
+#include <ufo_interfaces/msg/map.hpp>
+#include <ufo_interfaces/msg/nav_map.hpp>
+
 // STL
 #include <cstddef>
 
@@ -27,6 +31,22 @@ namespace ufo_ros
 |                                      From msg                                       |
 |                                                                                     |
 **************************************************************************************/
+
+template <class Map>
+void fromMsg(ufo_interfaces::msg::Map const& msg, Map& out, bool propagate = true)
+{
+	if (msg.data.empty()) {
+		return;
+	}
+
+	// TODO: Implement
+}
+
+template <std::size_t Dim>
+void fromMsg(ufo_interfaces::msg::NavMap const& msg)
+{
+	// TODO: Implement
+}
 
 template <class T = float>
 [[nodiscard]] ufo::Vec3<T> fromMsg(geometry_msgs::msg::Point const& msg)
@@ -129,6 +149,22 @@ template <class... Ts>
 |                                       To msg                                        |
 |                                                                                     |
 **************************************************************************************/
+
+template <class Map>
+ufo_interfaces::msg::Map toMsg(Map const& a)
+{
+	ufo_interfaces::msg::Map res;
+
+	// TODO: Implement
+
+	return res;
+}
+
+template <std::size_t Dim>
+ufo_interfaces::msg::NavMap toMsg()
+{
+	// TODO: Implement
+}
 
 // TODO: Do something with point?
 

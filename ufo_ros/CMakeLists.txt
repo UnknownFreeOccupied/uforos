@@ -9,17 +9,20 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(UFO REQUIRED COMPONENTS Cloud Math Vision)
+find_package(UFO REQUIRED COMPONENTS Cloud Map Math Vision)
+find_package(ufo_interfaces REQUIRED)
 
 add_library(ufo_ros INTERFACE)
 
 ament_target_dependencies(ufo_ros INTERFACE
   geometry_msgs
   sensor_msgs
+  ufo_interfaces
 )
 
 target_link_libraries(ufo_ros INTERFACE
   UFO::Cloud
+  UFO::Map
   UFO::Math
   UFO::Vision
 )
