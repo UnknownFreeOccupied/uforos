@@ -7,9 +7,46 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(UFO REQUIRED COMPONENTS Cloud Math Vision)
+
+add_library(ufo_ros INTERFACE)
+
+ament_target_dependencies(ufo_ros INTERFACE
+  geometry_msgs
+  sensor_msgs
+)
+
+target_link_libraries(ufo_ros INTERFACE
+  UFO::Cloud
+  UFO::Math
+  UFO::Vision
+)
+
+target_include_directories(ufo_ros INTERFACE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+install(DIRECTORY include/
+  DESTINATION include
+)
+
+install(TARGETS ufo_ros
+  EXPORT export_${PROJECT_NAME}
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
+
+ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
+ament_export_dependencies(
+  geometry_msgs
+  rclcpp 
+  sensor_msgs
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

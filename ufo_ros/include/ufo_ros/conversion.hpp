@@ -1,3 +1,0 @@
-namespace ufo_ros {
-	
-}
