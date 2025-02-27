@@ -10,6 +10,7 @@
 
 // UFO
 #include <ufo/cloud/cloud.hpp>
+#include <ufo/core/label.hpp>
 #include <ufo/math/transform3.hpp>
 #include <ufo/vision/color.hpp>
 
@@ -28,14 +29,14 @@ std::optional<sensor_msgs::PointField> getField(sensor_msgs::PointCloud2 const& 
 // Point clouds
 template <class... P>
 void fromMsg(sensor_msgs::PointCloud2 const& cloud_in, ufo::Cloud<P...>& cloud_out,
-              bool filter_nan = true)
+             bool filter_nan = true)
 {
 	if (0 == cloud_in.point_step || 0 == cloud_in.row_step || 0 == cloud_in.height) {
 		throw std::runtime_error("cloud_in point_step, height, and/or row_step is zero");
 	}
 
 	// for (int i = 0; i < cloud_in.fields.size(); ++i) {
-	// 	std::cout <<  cloud_in.fields[i].name.c_str() << std::endl;;
+	// 	std::cout << cloud_in.fields[i].name.c_str() << std::endl;
 	// }
 
 	// Get all fields
@@ -58,16 +59,21 @@ void fromMsg(sensor_msgs::PointCloud2 const& cloud_in, ufo::Cloud<P...>& cloud_o
 	// FIXME: Add different depending on the type
 	// Perhaps make them variants?
 	sensor_msgs::PointCloud2ConstIterator<float> iter_x(cloud_in, "x");
-	std::optional<sensor_msgs::PointCloud2ConstIterator<std::uint8_t>> iter_rgb;
-	// std::optional<sensor_msgs::PointCloud2ConstIterator<std::uint32_t>> iter_label;
-	// std::optional<sensor_msgs::PointCloud2ConstIterator<float>>         iter_value;
-	// std::optional<sensor_msgs::PointCloud2ConstIterator<float>>         iter_intensity;
+	std::optional<sensor_msgs::PointCloud2ConstIterator<std::uint8_t>>  iter_rgb;
+	std::optional<sensor_msgs::PointCloud2ConstIterator<std::uint32_t>> iter_label;
+	// std::optional<sensor_msgs::PointCloud2ConstIterator<float>> iter_value;
+	// std::optional<sensor_msgs::PointCloud2ConstIterator<float>> iter_intensity;
 
 	// Create optional iteraters if wanted and available
-	// if constexpr ((ufo::is_color_v<P> || ...)) {
 	if constexpr ((ufo::contains_type_v<ufo::Color, P> || ...)) {
 		if (rgb_field) {
 			iter_rgb.emplace(cloud_in, rgb_field->name);
+		}
+	}
+
+	if constexpr ((ufo::contains_type_v<ufo::Label, P> || ...)) {
+		if (label_field) {
+			iter_label.emplace(cloud_in, label_field->name);
 		}
 	}
 
@@ -108,6 +114,14 @@ void fromMsg(sensor_msgs::PointCloud2 const& cloud_in, ufo::Cloud<P...>& cloud_o
 					// TODO: What about alpha?
 				}
 			}
+
+			if constexpr ((ufo::contains_type_v<ufo::Label, P> || ...)) {
+				if (iter_label) {
+					auto& labels        = cloud_out.template get<ufo::Label>();
+					labels[index].label = *(*iter_label);
+				}
+			}
+
 			// if constexpr ((ufo::is_semantic_v<P> || ...)) {
 			// 	if (iter_label) {
 			// 		cloud_out[index].label = *(*iter_label);
@@ -128,6 +142,12 @@ void fromMsg(sensor_msgs::PointCloud2 const& cloud_in, ufo::Cloud<P...>& cloud_o
 		if constexpr ((ufo::contains_type_v<ufo::Color, P> || ...)) {
 			if (iter_rgb) {
 				++(*iter_rgb);
+			}
+		}
+
+		if constexpr ((ufo::contains_type_v<ufo::Label, P> || ...)) {
+			if (iter_label) {
+				++(*iter_label);
 			}
 		}
 		// if constexpr ((ufo::is_semantic_v<P> || ...)) {
@@ -221,7 +241,6 @@ constexpr P toMsg(ufo::Vec3<T> const& point)
 	return p;
 }
 
-
 // TODO: Implement below
 
 // //
@@ -238,8 +257,9 @@ constexpr P toMsg(ufo::Vec3<T> const& point)
 // 	}
 // 	ufo::Buffer buffer;
 // 	buffer.write(msg.data.data(),
-// 	             msg.data.size() * sizeof(decltype(ufo_msgs::Map::data)::value_type));
-// 	map.read(buffer, propagate);
+// 	             msg.data.size() *
+// sizeof(decltype(ufo_msgs::Map::data)::value_type)); 	map.read(buffer,
+// propagate);
 // }
 
 // //
@@ -248,14 +268,15 @@ constexpr P toMsg(ufo::Vec3<T> const& point)
 
 // template <class Map, class Predicates,
 //           typename = std::enable_if_t<!std::is_scalar_v<Predicates>>>
-// decltype(ufo_msgs::Map::data) toMsg(Map const& map, Predicates const& predicates,
-//                                       unsigned int depth = 0, bool compress = false,
-//                                       ufo::mt_t map_types                      = 0,
-//                                       int       compression_acceleration_level = 1,
-//                                       int       compression_level              = 0)
+// decltype(ufo_msgs::Map::data) toMsg(Map const& map, Predicates const&
+// predicates,
+//                                       unsigned int depth = 0, bool compress =
+//                                       false, ufo::mt_t map_types = 0, int
+//                                       compression_acceleration_level = 1, int
+//                                       compression_level              = 0)
 // {
-// 	auto                         data = map.write(predicates, depth, compress, map_types,
-// 	                                              compression_acceleration_level, compression_level);
+// 	auto                         data = map.write(predicates, depth,
+// compress, map_types, compression_acceleration_level, compression_level);
 // 	decltype(ufo_msgs::Map::data) ret;
 // 	ret.resize(data.size());
 // 	data.read(ret.data(), data.size());
@@ -264,12 +285,13 @@ constexpr P toMsg(ufo::Vec3<T> const& point)
 
 // template <class Map>
 // decltype(ufo_msgs::Map::data) toMsg(Map const& map, unsigned int depth = 0,
-//                                       bool compress = false, ufo::mt_t map_types = 0,
-//                                       int compression_acceleration_level = 1,
-//                                       int compression_level              = 0)
+//                                       bool compress = false, ufo::mt_t
+//                                       map_types = 0, int
+//                                       compression_acceleration_level = 1, int
+//                                       compression_level              = 0)
 // {
-// 	auto data = map.write(depth, compress, map_types, compression_acceleration_level,
-// 	                      compression_level);
+// 	auto data = map.write(depth, compress, map_types,
+// compression_acceleration_level, compression_level);
 // 	decltype(ufo_msgs::Map::data) ret;
 // 	ret.resize(data.size());
 // 	data.read(ret.data(), data.size());
@@ -278,12 +300,12 @@ constexpr P toMsg(ufo::Vec3<T> const& point)
 
 // template <class Map>
 // decltype(ufo_msgs::Map::data) toMsgModified(Map& map, bool compress = false,
-//                                               ufo::mt_t map_types                = 0,
-//                                               int compression_acceleration_level = 1,
-//                                               int compression_level              = 0)
+//                                               ufo::mt_t map_types = 0, int
+//                                               compression_acceleration_level
+//                                               = 1, int compression_level = 0)
 // {
-// 	auto data = map.writeModified(compress, map_types, compression_acceleration_level,
-// 	                              compression_level);
+// 	auto data = map.writeModified(compress, map_types,
+// compression_acceleration_level, compression_level);
 // 	decltype(ufo_msgs::Map::data) ret;
 // 	ret.resize(data.size());
 // 	data.read(ret.data(), data.size());
@@ -291,14 +313,17 @@ constexpr P toMsg(ufo::Vec3<T> const& point)
 // }
 
 // template <class Map>
-// decltype(ufo_msgs::Map::data) toMsgResetModified(Map& map, bool compress = false,
-//                                                    ufo::mt_t map_types                = 0,
-//                                                    int compression_acceleration_level = 1,
-//                                                    int compression_level              = 0)
+// decltype(ufo_msgs::Map::data) toMsgResetModified(Map& map, bool compress =
+// false,
+//                                                    ufo::mt_t map_types = 0,
+//                                                    int
+//                                                    compression_acceleration_level
+//                                                    = 1, int compression_level
+//                                                    = 0)
 // {
 // 	auto data = map.writeModifiedAndReset(
-// 	    compress, map_types, compression_acceleration_level, compression_level);
-// 	decltype(ufo_msgs::Map::data) ret;
+// 	    compress, map_types, compression_acceleration_level,
+// compression_level); 	decltype(ufo_msgs::Map::data) ret;
 // 	ret.resize(data.size());
 // 	data.read(ret.data(), data.size());
 // 	return ret;
