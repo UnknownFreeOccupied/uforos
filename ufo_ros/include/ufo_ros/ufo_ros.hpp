@@ -48,6 +48,12 @@ void fromMsg(ufo_interfaces::msg::NavMap const& msg)
 	// TODO: Implement
 }
 
+/*!
+ * @brief Convert a Point message to its equivalent ufo representation.
+ *
+ * @param msg A Point message.
+ * @return The converted Point message as a ufo Vec3.
+ */
 template <class T = float>
 [[nodiscard]] ufo::Vec3<T> fromMsg(geometry_msgs::msg::Point const& msg)
 {
@@ -55,6 +61,12 @@ template <class T = float>
 	                    static_cast<T>(msg.z));
 }
 
+/*!
+ * @brief Convert a Vector3 message to its equivalent ufo representation.
+ *
+ * @param msg A Vector3 message.
+ * @return The converted Vector3 message as a ufo Vec3.
+ */
 template <class T = float>
 [[nodiscard]] ufo::Vec3<T> fromMsg(geometry_msgs::msg::Vector3 const& msg)
 {
@@ -62,6 +74,12 @@ template <class T = float>
 	                    static_cast<T>(msg.z));
 }
 
+/*!
+ * @brief Convert a Quaternion message to its equivalent ufo representation.
+ *
+ * @param msg A Quaternion message.
+ * @return The converted Quaternion message as a ufo Quat.
+ */
 template <class T = float>
 [[nodiscard]] ufo::Quat<T> fromMsg(geometry_msgs::msg::Quaternion const& msg)
 {
@@ -69,12 +87,24 @@ template <class T = float>
 	                    static_cast<T>(msg.z));
 }
 
+/*!
+ * @brief Convert a Transform message to its equivalent ufo representation.
+ *
+ * @param msg A Transform message.
+ * @return The converted Transform message as a ufo Transform3.
+ */
 template <class T = float>
 [[nodiscard]] ufo::Transform3<T> fromMsg(geometry_msgs::msg::Transform const& msg)
 {
 	return ufo::Transform3<T>(fromMsg<T>(msg.rotation), fromMsg<T>(msg.translation));
 }
 
+/*!
+ * @brief Convert a Pose message to its equivalent ufo representation.
+ *
+ * @param msg A Pose message.
+ * @return The converted Pose message as a ufo Transform3.
+ */
 template <class T = float>
 [[nodiscard]] ufo::Transform3<T> fromMsg(geometry_msgs::msg::Pose const& msg)
 {
