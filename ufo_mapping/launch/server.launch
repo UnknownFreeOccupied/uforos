@@ -3,13 +3,14 @@
 	<arg name="resolution" default="0.05" />
 	<arg name="depth_levels" default="17" />
 	<arg name="frame_id" default="map" />
+  <arg name="insert_hits" default="inset_hits_topic"/>
+  <arg name="insert_rays" default="insert_ray_topic"/>
 
   <node pkg="ufo_mapping" type="ufo_mapping_server_node" name="ufo_mapping_server_node" output="screen" required="true">
 		<param name="map_resolution_m" value="$(arg resolution)" />
 		<param name="map_depth_levels" value="$(arg depth_levels)" />
 		<param name="map_frame_id" value="$(arg frame_id)" />
-        <!-- <remap from="insert_hits" to="/kitti/velo/pointcloud" /> -->
-        <remap from="insert_hits" to="/camera/depth/points" />
-        <!-- <remap from="insert_rays" to="/camera/depth/points" /> -->
+    <remap from="insert_hits" to="$(arg insert_hits)" />
+    <remap from="insert_rays" to="$(arg insert_rays)" />
   </node>
 </launch>

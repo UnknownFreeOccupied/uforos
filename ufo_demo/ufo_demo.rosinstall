@@ -1,0 +1,14 @@
+- git:
+    local-name: turtlebot/turtlebot3_simulations
+    uri: https://github.com/ROBOTIS-GIT/turtlebot3_simulations.git
+    version: noetic
+
+- git:
+    local-name: turtlebot/turtlebot3
+    uri: https://github.com/ROBOTIS-GIT/turtlebot3.git
+    version: noetic
+
+- git:
+    local-name: turtlebot/turtlebot3_msgs
+    uri: https://github.com/ROBOTIS-GIT/turtlebot3_msgs.git
+    version: noetic
