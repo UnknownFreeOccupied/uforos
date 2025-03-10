@@ -3,12 +3,18 @@
 
 // UFO
 #include <ufo/cloud/point_cloud.hpp>
+#include <ufo/map/header.hpp>
+#include <ufo/map/type.hpp>
+#include <ufo/map/ufomap.hpp>
 #include <ufo/math/quat.hpp>
 #include <ufo/math/transform.hpp>
+#include <ufo/utility/enum.hpp>
 #include <ufo/vision/color.hpp>
 
 // UFO ROS
 #include <ufo_interfaces/msg/map.hpp>
+#include <ufo_interfaces/msg/map_info.hpp>
+#include <ufo_interfaces/msg/map_type_info.hpp>
 #include <ufo_interfaces/msg/nav_map.hpp>
 
 // STL
@@ -32,14 +38,44 @@ namespace ufo_ros
 |                                                                                     |
 **************************************************************************************/
 
+[[nodiscard]] inline ufo::MapTypeInfo fromMsg(ufo_interfaces::msg::MapTypeInfo const& msg)
+{
+	ufo::MapTypeInfo res;
+	res.type = static_cast<ufo::MapType>(msg.id);
+	res.size = msg.size;
+	return res;
+}
+
+[[nodiscard]] inline ufo::MapHeader fromMsg(ufo_interfaces::msg::MapInfo const& msg)
+{
+	ufo::MapHeader res;
+	res.major = msg.version.major;
+	res.minor = msg.version.minor;
+	res.patch = msg.version.patch;
+	res.leaf_node_length.assign(msg.leaf_node_length.begin(), msg.leaf_node_length.end());
+	res.num_depth_levels = msg.num_depth_levels;
+	res.num_blocks       = msg.num_blocks;
+	res.num_nodes        = msg.num_nodes;
+	res.map_info.resize(msg.map.size());
+	for (std::size_t i{}; msg.map.size() > i; ++i) {
+		res.map_info[i] = fromMsg(msg.map[i]);
+	}
+	return res;
+}
+
 template <class Map>
-void fromMsg(ufo_interfaces::msg::Map const& msg, Map& out, bool propagate = true)
+void fromMsg(ufo_interfaces::msg::Map const& msg, Map& map,
+             ufo::MapType map_types = ufo::MapType::ALL, bool propagate = true)
 {
 	if (msg.data.empty()) {
 		return;
 	}
 
-	// TODO: Implement
+	ufo::MapHeader header = fromMsg(msg.info);
+
+	ufo::Buffer buffer;
+	buffer.write(msg.data.data(), msg.data.size());
+	map.readData(buffer, header, map_types, propagate);
 }
 
 template <std::size_t Dim>
@@ -180,20 +216,61 @@ template <class... Ts>
 |                                                                                     |
 **************************************************************************************/
 
-template <class Map>
-ufo_interfaces::msg::Map toMsg(Map const& a)
+[[nodiscard]] inline ufo_interfaces::msg::MapTypeInfo toMsg(ufo::MapTypeInfo const& a)
 {
-	ufo_interfaces::msg::Map res;
+	ufo_interfaces::msg::MapTypeInfo res;
+	res.type = ufo::to_string(a.type);
+	res.id   = ufo::to_underlying(a.type);
+	res.size = a.size;
+	return res;
+}
 
-	// TODO: Implement
+[[nodiscard]] inline ufo_interfaces::msg::MapInfo toMsg(ufo::MapHeader const& a)
+{
+	ufo_interfaces::msg::MapInfo res;
+	res.version.major = a.major;
+	res.version.minor = a.minor;
+	res.version.patch = a.patch;
+	res.dimensions    = a.leaf_node_length.size();
+	res.leaf_node_length.assign(a.leaf_node_length.begin(), a.leaf_node_length.end());
+	res.num_depth_levels = a.num_depth_levels;
+	res.num_blocks       = a.num_blocks;
+	res.num_nodes        = a.num_nodes;
+	res.compressed       = false;
+	res.map.resize(a.map_info.size());
+	for (std::size_t i{}; a.map_info.size() > i; ++i) {
+		res.map[i] = toMsg(a.map_info[i]);
+	}
+	res.map[0].type = "tree";
+	return res;
+}
+
+template <class Map, class Predicate = ufo::pred::Leaf,
+          std::enable_if_t<ufo::pred::is_pred_v<Predicate, Map>, bool> = true>
+[[nodiscard]] ufo_interfaces::msg::Map toMsg(Map const&       a,
+                                             Predicate const& pred  = ufo::pred::Leaf{},
+                                             ufo::MapType map_types = ufo::MapType::ALL)
+{
+	ufo::Buffer buffer;
+	auto        map_header = a.writeData(buffer, pred, map_types);
+
+	ufo_interfaces::msg::Map res;
+	res.info = toMsg(map_header);
+	// TODO: Make sure size is correct
+	res.data.resize(buffer.size());
+	buffer.read(res.data.data(), res.data.size());
 
 	return res;
 }
 
 template <std::size_t Dim>
-ufo_interfaces::msg::NavMap toMsg()
+[[nodiscard]] ufo_interfaces::msg::NavMap toMsg()
 {
+	ufo_interfaces::msg::NavMap res;
+
 	// TODO: Implement
+
+	return res;
 }
 
 // TODO: Do something with point?

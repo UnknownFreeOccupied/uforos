@@ -1,0 +1,9 @@
+launch:
+
+- node:
+    pkg: "ufo_mapping"
+    exec: "server_2d"
+    name: "mapping_server_2d"
+    namespace: "ufo"
+    output: "screen"
+    emulate_tty: true

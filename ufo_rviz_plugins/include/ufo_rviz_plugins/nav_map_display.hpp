@@ -1,9 +1,9 @@
-#ifndef UFO_RVIZ_PLUGINS_MAP_DISPLAY_HPP
-#define UFO_RVIZ_PLUGINS_MAP_DISPLAY_HPP
+#ifndef UFO_RVIZ_PLUGINS_NAV_MAP_DISPLAY_HPP
+#define UFO_RVIZ_PLUGINS_NAV_MAP_DISPLAY_HPP
 
 // UFO
 #include <ufo/plan/nav_map.hpp>
-#include <ufo_interfaces/msg/map.hpp>
+#include <ufo_interfaces/msg/nav_map.hpp>
 
 // ROS
 #include <rviz_common/message_filter_display.hpp>
@@ -19,23 +19,22 @@
 
 namespace ufo_rviz_plugins
 {
-class MapDisplay : public rviz_common::MessageFilterDisplay<ufo_interfaces::msg::Map>
+class NavMapDisplay
+    : public rviz_common::MessageFilterDisplay<ufo_interfaces::msg::NavMap>
 {
 	Q_OBJECT
 
  public:
-	MapDisplay();
+	NavMapDisplay();
 
-	~MapDisplay() override;
+	~NavMapDisplay() override;
 
  protected:
 	void onInitialize() override;
 
 	void reset() override;
 
-	void processMessage(ufo_interfaces::msg::Map::ConstSharedPtr const msg) override;
-
-	void update(float wall_dt, float ros_dt) override;
+	void processMessage(ufo_interfaces::msg::NavMap::ConstSharedPtr const msg) override;
 
  private Q_SLOTS:
 	void updateEdgeWidth();
@@ -58,4 +57,4 @@ class MapDisplay : public rviz_common::MessageFilterDisplay<ufo_interfaces::msg:
 };
 }  // namespace ufo_rviz_plugins
 
-#endif  // UFO_RVIZ_PLUGINS_MAP_DISPLAY_HPP
+#endif  // UFO_RVIZ_PLUGINS_NAV_MAP_DISPLAY_HPP

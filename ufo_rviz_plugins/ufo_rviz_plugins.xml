@@ -1,5 +1,13 @@
-<library path="plan_display">
-  <class type="ufo_rviz_plugins::PlanDisplay" base_class_type="rviz_common::Display">
-    <description></description>
+<library path="map_display">
+  <class name="Map" type="ufo_rviz_plugins::MapDisplay" base_class_type="rviz_common::Display">
+    <description>Display for UFO Map</description>
+    <message_type>ufo_interfaces/msg/Map</message_type>
+  </class>
+</library>
+
+<library path="nav_map_display">
+  <class name="NavMap" type="ufo_rviz_plugins::NavMapDisplay" base_class_type="rviz_common::Display">
+    <description>Display for UFO Navigation Map</description>
+    <message_type>ufo_interfaces/msg/NavMap</message_type>
   </class>
 </library>

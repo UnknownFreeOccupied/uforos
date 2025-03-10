@@ -1,5 +1,7 @@
 # Header
 std_msgs/Header header
 
-# Binary serialization, use conversions.h to read and write
-int8[] data
+MapInfo info
+
+# Binary serialization, use ufo_ros package to read and write
+uint8[] data

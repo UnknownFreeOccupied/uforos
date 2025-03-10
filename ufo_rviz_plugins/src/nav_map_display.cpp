@@ -1,14 +1,14 @@
 // UFO
-#include <ufo_rviz_plugins/map_display.hpp>
+#include <ufo_rviz_plugins/nav_map_display.hpp>
 
 // ROS
 #include <rviz_common/logging.hpp>
 
 namespace ufo_rviz_plugins
 {
-MapDisplay::MapDisplay()
+NavMapDisplay::NavMapDisplay()
 {
-	RVIZ_COMMON_LOG_INFO_STREAM("Creating MapDisplay");
+	RVIZ_COMMON_LOG_INFO_STREAM("Creating NavMapDisplay");
 
 	edge_width_property_ = new rviz_common::properties::FloatProperty(
 	    "Edge Width", 0.03f, "The width, in meters, of each edge.", this,
@@ -24,32 +24,32 @@ MapDisplay::MapDisplay()
 	// TODO: Implement
 }
 
-MapDisplay::~MapDisplay()
+NavMapDisplay::~NavMapDisplay()
 {
-	RVIZ_COMMON_LOG_INFO_STREAM("Destroying MapDisplay");
+	RVIZ_COMMON_LOG_INFO_STREAM("Destroying NavMapDisplay");
 
 	// TODO: Implement
 }
 
-void MapDisplay::onInitialize()
+void NavMapDisplay::onInitialize()
 {
 	MFDClass::onInitialize();
 
-	RVIZ_COMMON_LOG_INFO_STREAM("Initializing MapDisplay");
+	RVIZ_COMMON_LOG_INFO_STREAM("Initializing NavMapDisplay");
 
 	// TODO: Implement
 }
 
-void MapDisplay::reset()
+void NavMapDisplay::reset()
 {
 	MFDClass::reset();
 
-	RVIZ_COMMON_LOG_INFO_STREAM("Resetting MapDisplay");
+	RVIZ_COMMON_LOG_INFO_STREAM("Resetting NavMapDisplay");
 
 	// TODO: Implement
 }
 
-void MapDisplay::processMessage(ufo_interfaces::msg::Map::ConstSharedPtr const msg)
+void NavMapDisplay::processMessage(ufo_interfaces::msg::NavMap::ConstSharedPtr const msg)
 {
 	RVIZ_COMMON_LOG_INFO_STREAM("Received plan with " << msg->header.frame_id
 	                                                  << " waypoints");
@@ -57,7 +57,7 @@ void MapDisplay::processMessage(ufo_interfaces::msg::Map::ConstSharedPtr const m
 	// TODO: Implement
 }
 
-void MapDisplay::updateEdgeWidth()
+void NavMapDisplay::updateEdgeWidth()
 {
 	float edge_width = edge_width_property_->getFloat();
 
@@ -68,7 +68,7 @@ void MapDisplay::updateEdgeWidth()
 	context_->queueRender();
 }
 
-void MapDisplay::updateEdgeStyle()
+void NavMapDisplay::updateEdgeStyle()
 {
 	auto style = static_cast<EdgeStyle>(edge_style_property_->getOptionInt());
 
@@ -83,4 +83,4 @@ void MapDisplay::updateEdgeStyle()
 }  // namespace ufo_rviz_plugins
 
 #include <pluginlib/class_list_macros.hpp>
-PLUGINLIB_EXPORT_CLASS(ufo_rviz_plugins::MapDisplay, rviz_common::Display)
+PLUGINLIB_EXPORT_CLASS(ufo_rviz_plugins::NavMapDisplay, rviz_common::Display)

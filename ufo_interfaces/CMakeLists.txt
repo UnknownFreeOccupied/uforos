@@ -13,7 +13,10 @@ find_package(std_msgs REQUIRED)
 
 set(msg_files
   "msg/Map.msg"
-  "msg/Plan.msg"
+  "msg/MapInfo.msg"
+  "msg/MapTypeInfo.msg"
+  "msg/NavMap.msg"
+  "msg/Version.msg"
 )
 set(srv_files
   "srv/ClearMap.srv"

@@ -1,0 +1,9 @@
+launch:
+
+- node:
+    pkg: "ufo_planning"
+    exec: "server_2d"
+    name: "planning_server_2d"
+    namespace: "ufo"
+    output: "screen"
+    emulate_tty: true
