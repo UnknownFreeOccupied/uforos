@@ -1,5 +1,7 @@
 // UFO
 #include <ufo/cloud/ufo.hpp>
+#include <ufo/math/math.hpp>
+#include <ufo/math/numbers.hpp>
 
 // UFO ROS
 #include <ufo_mapping/server_3d.hpp>
@@ -15,7 +17,7 @@
 namespace ufo_mapping
 {
 MappingServer<3>::MappingServer(rclcpp::NodeOptions const& options)
-    : rclcpp::Node("mapping_server_3d", options)
+    : rclcpp::Node("mapping_server_3d", options), map_(1.0)
 {
 	map_frame_ = this->declare_parameter<std::string>("map_frame", "map_gt");
 	timeout_   = this->declare_parameter<double>("tf_timeout", 1.0);
@@ -25,114 +27,157 @@ MappingServer<3>::MappingServer(rclcpp::NodeOptions const& options)
 
 	map_pub_ = this->create_publisher<ufo_interfaces::msg::Map>("map", 10);
 
-	insert_points_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
-	    "insert_points", 10,
-	    [this](sensor_msgs::msg::PointCloud2::SharedPtr const msg) { insertPoints(msg); });
-	insert_rays_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
-	    "/Evolo/Lidar/MidRes", 10,
-	    [this](sensor_msgs::msg::PointCloud2::SharedPtr const msg) { insertRays(msg); });
+	insert_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
+	    "insert", 10,
+	    [this](sensor_msgs::msg::PointCloud2::SharedPtr const msg) { insert(msg); });
 
-	inverse_integrator.max_distance = 50.0f;
+	bool kitti = false;
 
-	// auto header = map_.header();
-	// header.write("/home/dduberg/Desktop/header.ufo");
+	if (!kitti) {
+		inverse_integrator.treat_nan_as_infinity = true;
+		inverse_integrator.max_distance          = 130.0f;
 
-	// ufo::MapHeader header2;
-	// std::cout << header2 << '\n';
-	// header2.read("/home/dduberg/Desktop/header.ufo");
-	// std::cout << header2 << '\n';
+		std::ifstream file;
+		file.exceptions(std::ifstream::badbit);
+		file.imbue(std::locale());
+		file.open("/home/dduberg/Desktop/points.data", std::ios::in | std::ios::binary);
 
-	// ufo_interfaces::msg::Map msg = ufo_ros::toMsg(map_);
-	// map_pub_->publish(msg);
+		std::uint64_t size;
+		file.read(reinterpret_cast<char*>(&size), sizeof(size));
+		std::vector<ufo::Vec3f> points(size);
+		file.read(reinterpret_cast<char*>(points.data()), size * sizeof(ufo::Vec3f));
 
-	// RCLCPP_ERROR(this->get_logger(), "Writing map");
-	// auto buf = map_.write();
-	// RCLCPP_ERROR(this->get_logger(), "Wrote map");
-	// RCLCPP_ERROR(this->get_logger(), "Reading map");
-	// map_.read(buf);
-	// RCLCPP_ERROR(this->get_logger(), "Read map");
+		std::vector<ufo::OctCode> codes;
+		for (auto const& n : map_.query(ufo::pred::Z() < 0.01f, false, true)) {
+			codes.push_back(n.code);
+		}
 
-	// map_.occupancySet(ufo::Vec3f(0, 0, 0), 0.1f, false);
-	// map_.modifiedSet(ufo::Vec3f(0, 0, 0), true);
+		for (auto const& c : codes) {
+			map_.voidRegionSet(c, true, true);
+		}
 
-	// double total_total_ms{};
-	// double total_read_cloud_ms{};
-	// double total_integrate_ms{};
-	// double total_publish_ms{};
-	// double total_propagate_ms{};
+		for (auto& p : points) {
+			if (-10.0f > p.z) {
+				p.x = std::numeric_limits<float>::quiet_NaN();
+				p.y = std::numeric_limits<float>::quiet_NaN();
+				p.z = std::numeric_limits<float>::quiet_NaN();
+			}
+		}
 
-	// std::size_t num_clouds = 50;
-	// for (std::size_t iter{}; num_clouds > iter && rclcpp::ok(); ++iter) {
-	// 	auto const t1 = std::chrono::high_resolution_clock::now();
+		inverse_integrator.generateConfig(map_, points);
+	}
 
-	// 	ufo::PointCloud<3, float, ufo::Color> cloud;
-	// 	ufo::Transform3f                      transform;
-	// 	ufo::readCloudUFO("/home/dduberg/ufo5/lib/viz/resources/kitti/ufo/0000_cloud.ufo",
-	// 	                  cloud, transform);
-	// 	transform.translation.z -= iter * 10;
-	// 	auto const t2 = std::chrono::high_resolution_clock::now();
+	// inverse_integrator.generateConfig(map_, 0.0, 2.0 * ufo::numbers::pi_v<double>,
+	//                                   2.0 * ufo::numbers::pi_v<double> / 3600.0,
+	//                                   ufo::radians(-16.0), ufo::radians(16.0),
+	//                                   ufo::radians(1.0),
+	//                                   ufo::ScanOrder::HORIZONTAL_MAJOR);
 
-	// 	inverse_integrator(ufo::execution::par, map_, cloud, transform, false);
-	// 	auto const t3 = std::chrono::high_resolution_clock::now();
+	if (kitti) {
+		inverse_integrator.treat_nan_as_infinity = false;
+		inverse_integrator.max_distance          = 50.0f;
 
-	// 	// publishUpdate(msg->header.stamp);
-	// 	auto const t4 = std::chrono::high_resolution_clock::now();
+		double total_total_ms{};
+		double total_read_cloud_ms{};
+		double total_integrate_ms{};
+		double total_publish_ms{};
+		double total_propagate_ms{};
 
-	// 	// map_.modifiedPropagate(ufo::execution::par, ufo::MapType::ALL, true, false);
-	// 	auto const t5 = std::chrono::high_resolution_clock::now();
+		std::size_t num_clouds = 50;
+		for (std::size_t iter{}; num_clouds > iter && rclcpp::ok(); ++iter) {
+			auto const t1 = std::chrono::high_resolution_clock::now();
 
-	// 	std::chrono::duration<double, std::milli> const total_ms      = t5 - t1;
-	// 	std::chrono::duration<double, std::milli> const read_cloud_ms = t2 - t1;
-	// 	std::chrono::duration<double, std::milli> const integrate_ms  = t3 - t2;
-	// 	std::chrono::duration<double, std::milli> const publish_ms    = t4 - t3;
-	// 	std::chrono::duration<double, std::milli> const propagate_ms  = t5 - t4;
+			ufo::PointCloud<3, float, ufo::Color> cloud;
+			ufo::Transform3f                      transform;
+			ufo::readCloudUFO("/home/dduberg/ufo3/lib/viz/resources/kitti/ufo/0000_cloud.ufo",
+			                  cloud, transform);
+			transform.translation.z -= iter * 10;
 
-	// 	if (0 != iter) {
-	// 		total_total_ms += total_ms.count();
-	// 		total_read_cloud_ms += read_cloud_ms.count();
-	// 		total_integrate_ms += integrate_ms.count();
-	// 		total_publish_ms += publish_ms.count();
-	// 		total_propagate_ms += propagate_ms.count();
+			if (0 == iter) {
+				inverse_integrator.generateConfig(map_, cloud);
+			}
+
+			auto const t2 = std::chrono::high_resolution_clock::now();
+
+			inverse_integrator(ufo::execution::par, map_, cloud, transform, false);
+			auto const t3 = std::chrono::high_resolution_clock::now();
+
+			// publishUpdate(msg->header.stamp);
+			auto const t4 = std::chrono::high_resolution_clock::now();
+
+			// map_.modifiedPropagate(ufo::execution::par, ufo::MapType::ALL, true, false);
+			auto const t5 = std::chrono::high_resolution_clock::now();
+
+			std::chrono::duration<double, std::milli> const total_ms      = t5 - t1;
+			std::chrono::duration<double, std::milli> const read_cloud_ms = t2 - t1;
+			std::chrono::duration<double, std::milli> const integrate_ms  = t3 - t2;
+			std::chrono::duration<double, std::milli> const publish_ms    = t4 - t3;
+			std::chrono::duration<double, std::milli> const propagate_ms  = t5 - t4;
+
+			if (0 != iter) {
+				total_total_ms += total_ms.count();
+				total_read_cloud_ms += read_cloud_ms.count();
+				total_integrate_ms += integrate_ms.count();
+				total_publish_ms += publish_ms.count();
+				total_propagate_ms += propagate_ms.count();
+			}
+
+			// std::cout << "[Total: " << total_ms.count() << " ms]";
+			// std::cout << "[Read cloud: " << read_cloud_ms.count() << " ms]";
+			// std::cout << "[Integrate: " << integrate_ms.count() << " ms]";
+			// std::cout << "[Publish: " << publish_ms.count() << " ms]";
+			// std::cout << "[Propagate: " << propagate_ms.count() << " ms]";
+			// std::cout << "[Num. nodes: " << map_.size() << "]";
+			// std::cout << '\n';
+		}
+
+		std::cout << "Total:\n";
+		std::cout << "[Total: " << total_total_ms << " ms]";
+		std::cout << "[Read cloud: " << total_read_cloud_ms << " ms]";
+		std::cout << "[Integrate: " << total_integrate_ms << " ms]";
+		std::cout << "[Publish: " << total_publish_ms << " ms]";
+		std::cout << "[Propagate: " << total_propagate_ms << " ms]";
+		std::cout << "[Num. nodes: " << map_.size() << "]";
+		std::cout << '\n';
+
+		--num_clouds;
+
+		std::cout << "Average:\n";
+		std::cout << "[Total: " << (total_total_ms / num_clouds) << " ms]";
+		std::cout << "[Read cloud: " << (total_read_cloud_ms / num_clouds) << " ms]";
+		std::cout << "[Integrate: " << (total_integrate_ms / num_clouds) << " ms]";
+		std::cout << "[Publish: " << (total_publish_ms / num_clouds) << " ms]";
+		std::cout << "[Propagate: " << (total_propagate_ms / num_clouds) << " ms]";
+		std::cout << "[Num. nodes: " << map_.size() << "]";
+		std::cout << '\n';
+	}
+}
+
+void MappingServer<3>::insert(sensor_msgs::msg::PointCloud2::SharedPtr const msg)
+{
+	// {
+	// 	auto cloud = ufo_ros::fromMsg(*msg);
+
+	// 	static std::vector<ufo::Vec3f> points(
+	// 	    cloud.size(), ufo::Vec3f(std::numeric_limits<float>::quiet_NaN()));
+	// 	for (std::size_t i{}; cloud.size() > i; ++i) {
+	// 		auto p = ufo::get<0>(cloud)[i];
+	// 		if (!isnan(p) && ufo::Vec3f{} != p) {
+	// 			points[i] = p;
+	// 		}
 	// 	}
 
-	// 	// std::cout << "[Total: " << total_ms.count() << " ms]";
-	// 	// std::cout << "[Read cloud: " << read_cloud_ms.count() << " ms]";
-	// 	// std::cout << "[Integrate: " << integrate_ms.count() << " ms]";
-	// 	// std::cout << "[Publish: " << publish_ms.count() << " ms]";
-	// 	// std::cout << "[Propagate: " << propagate_ms.count() << " ms]";
-	// 	// std::cout << "[Num. nodes: " << map_.size() << "]";
-	// 	// std::cout << '\n';
+	// 	std::ofstream file;
+	// 	file.exceptions(std::ifstream::badbit);
+	// 	file.imbue(std::locale());
+	// 	file.open("/home/dduberg/Desktop/points.data", std::ios::out | std::ios::binary);
+
+	// 	std::uint64_t size = points.size();
+	// 	file.write(reinterpret_cast<char*>(&size), sizeof(size));
+	// 	file.write(reinterpret_cast<char const*>(points.data()), size * sizeof(ufo::Vec3f));
+	// 	return;
 	// }
 
-	// std::cout << "Total:\n";
-	// std::cout << "[Total: " << total_total_ms << " ms]";
-	// std::cout << "[Read cloud: " << total_read_cloud_ms << " ms]";
-	// std::cout << "[Integrate: " << total_integrate_ms << " ms]";
-	// std::cout << "[Publish: " << total_publish_ms << " ms]";
-	// std::cout << "[Propagate: " << total_propagate_ms << " ms]";
-	// std::cout << "[Num. nodes: " << map_.size() << "]";
-	// std::cout << '\n';
-
-	// --num_clouds;
-
-	// std::cout << "Average:\n";
-	// std::cout << "[Total: " << (total_total_ms / num_clouds) << " ms]";
-	// std::cout << "[Read cloud: " << (total_read_cloud_ms / num_clouds) << " ms]";
-	// std::cout << "[Integrate: " << (total_integrate_ms / num_clouds) << " ms]";
-	// std::cout << "[Publish: " << (total_publish_ms / num_clouds) << " ms]";
-	// std::cout << "[Propagate: " << (total_propagate_ms / num_clouds) << " ms]";
-	// std::cout << "[Num. nodes: " << map_.size() << "]";
-	// std::cout << '\n';
-}
-
-void MappingServer<3>::insertPoints(
-    sensor_msgs::msg::PointCloud2::SharedPtr const /* msg */)
-{
-	// TODO: Implement
-}
-
-void MappingServer<3>::insertRays(sensor_msgs::msg::PointCloud2::SharedPtr const msg)
-{
 	auto transform = lookupTransform(map_frame_, msg->header.frame_id, msg->header.stamp,
 	                                 rclcpp::Duration::from_seconds(timeout_));
 	if (!transform.has_value()) {
@@ -144,18 +189,14 @@ void MappingServer<3>::insertRays(sensor_msgs::msg::PointCloud2::SharedPtr const
 	auto const t2    = std::chrono::high_resolution_clock::now();
 
 	// TODO: Remove this
-	static bool first_time = true;
-	if (!first_time) {
-		for (auto& p : ufo::get<0>(cloud)) {
-			auto t = transform.value()(p);
-			if (0.0f > t.z) {
-				p.x = std::numeric_limits<float>::quiet_NaN();
-				p.y = std::numeric_limits<float>::quiet_NaN();
-				p.z = std::numeric_limits<float>::quiet_NaN();
-			}
+	for (auto& p : ufo::get<0>(cloud)) {
+		auto t = transform.value()(p);
+		if (0.0f > t.z) {
+			p.x = std::numeric_limits<float>::quiet_NaN();
+			p.y = std::numeric_limits<float>::quiet_NaN();
+			p.z = std::numeric_limits<float>::quiet_NaN();
 		}
 	}
-	first_time = false;
 
 	inverse_integrator(ufo::execution::par, map_, cloud, transform.value(), false);
 	auto const t3 = std::chrono::high_resolution_clock::now();
@@ -163,7 +204,7 @@ void MappingServer<3>::insertRays(sensor_msgs::msg::PointCloud2::SharedPtr const
 	publishUpdate(msg->header.stamp);
 	auto const t4 = std::chrono::high_resolution_clock::now();
 
-	map_.modifiedPropagate(ufo::execution::par, ufo::MapType::ALL, true, false);
+	map_.modifiedPropagate(ufo::execution::par, false);
 	auto const t5 = std::chrono::high_resolution_clock::now();
 
 	std::chrono::duration<double, std::milli> const total_ms     = t5 - t1;
@@ -181,28 +222,47 @@ void MappingServer<3>::insertRays(sensor_msgs::msg::PointCloud2::SharedPtr const
 	std::cout << '\n';
 
 	ufo::PointCloud<3, float> dynamic_cloud;
+	ufo::PointCloud<3, float> dynamic_secondary_cloud;
 	ufo::PointCloud<3, float> static_cloud;
 
+	// for (auto p : inverse_integrator.directions_) {
+	// 	static_cloud.push_back(ufo::cast<float>(5.0 * p));
+	// }
+
 	for (auto const& p : ufo::get<0>(cloud)) {
-		if (map_.voidRegion(p)) {
-			dynamic_cloud.push_back(p);
+		if (isnan(p)) {
+			continue;
+		}
+
+		auto t_p = transform.value()(p);
+		if (map_.voidRegion(t_p)) {
+			dynamic_cloud.push_back(t_p);
+		} else if (map_.voidRegionSecondary(t_p)) {
+			dynamic_secondary_cloud.push_back(t_p);
 		} else {
-			static_cloud.push_back(p);
+			static_cloud.push_back(t_p);
 		}
 	}
 
-	auto dynamic_msg = ufo_ros::toMsg(dynamic_cloud);
-	auto static_msg  = ufo_ros::toMsg(static_cloud);
+	auto dynamic_msg           = ufo_ros::toMsg(dynamic_cloud);
+	auto dynamic_secondary_msg = ufo_ros::toMsg(dynamic_secondary_cloud);
+	auto static_msg            = ufo_ros::toMsg(static_cloud);
 
-	dynamic_msg.header = msg->header;
-	static_msg.header  = msg->header;
+	dynamic_msg.header.frame_id = map_frame_;
+	dynamic_msg.header.stamp    = msg->header.stamp;
+	// dynamic_msg.header           = msg->header;
+	dynamic_secondary_msg.header = dynamic_msg.header;
+	static_msg.header            = dynamic_msg.header;
 
 	static auto dynamic_pub =
 	    this->create_publisher<sensor_msgs::msg::PointCloud2>("dynamic", 10);
+	static auto dynamic_secondary_pub =
+	    this->create_publisher<sensor_msgs::msg::PointCloud2>("dynamic_secondary", 10);
 	static auto static_pub =
 	    this->create_publisher<sensor_msgs::msg::PointCloud2>("static", 10);
 
 	dynamic_pub->publish(dynamic_msg);
+	dynamic_secondary_pub->publish(dynamic_secondary_msg);
 	static_pub->publish(static_msg);
 }
 

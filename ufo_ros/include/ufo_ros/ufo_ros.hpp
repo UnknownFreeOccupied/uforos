@@ -26,6 +26,7 @@
 #include <geometry_msgs/msg/quaternion.hpp>
 #include <geometry_msgs/msg/transform.hpp>
 #include <geometry_msgs/msg/vector3.hpp>
+#include <sensor_msgs/msg/laser_scan.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 #include <sensor_msgs/point_field_conversion.hpp>
@@ -209,6 +210,24 @@ template <class... Ts>
 {
 	return fromMsg<3, float, Ts...>(msg);
 }
+
+// [[nodiscard]] inline ufo::PointCloud<2, float> fromMsg(
+//     sensor_msgs::msg::LaserScan const& msg, bool out_of_range_to_nan)
+// {
+// TODO: Implement
+// ufo::PointCloud<2, float> res;
+// res.reserve(msg->ranges.size());
+
+// float angle = msg->angle_min;
+// for (float range : msg->ranges) {
+// 	if (msg->range_min > range || msg->range_max < range || std::isnan(range)) {
+// 		res.push_back(out_of_range_to_nan ? std::numeric_limits<float>::quiet_NaN() : )
+// 	}
+// 	// TODO: Implement
+// }
+
+// return res;
+// }
 
 /**************************************************************************************
 |                                                                                     |

@@ -35,7 +35,7 @@ class MappingServer<2> : public rclcpp::Node
 	MappingServer(rclcpp::NodeOptions const& options = rclcpp::NodeOptions());
 
  private:
-	void insertPoints(sensor_msgs::msg::LaserScan::SharedPtr const msg);
+	void insert(sensor_msgs::msg::LaserScan::SharedPtr const msg);
 
 	void insertRays(sensor_msgs::msg::LaserScan::SharedPtr const msg);
 
@@ -44,19 +44,23 @@ class MappingServer<2> : public rclcpp::Node
 	    rclcpp::Time const&     time,
 	    rclcpp::Duration const& timeout = rclcpp::Duration::from_nanoseconds(0)) const;
 
+	void publishUpdate(rclcpp::Time const& time) const;
+
  private:
 	ufo::Map2D<ufo::OccupancyMap, ufo::ColorMap, ufo::VoidRegionMap> map_;
 
-	ufo::SimpleIntegrator<2>  simple_integrator_;
-	ufo::InverseIntegrator<2> inverse_integrator_;
+	ufo::SimpleIntegrator<2>  simple_integrator;
+	ufo::InverseIntegrator<2> inverse_integrator;
 
 	// TF
 	std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
 	std::unique_ptr<tf2_ros::Buffer>            tf_buffer_;
 	std::string                                 map_frame_;
+	double                                      timeout_;
 
-	rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr insert_points_sub_;
-	rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr insert_rays_sub_;
+	rclcpp::Publisher<ufo_interfaces::msg::Map>::SharedPtr map_pub_;
+
+	rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr insert_sub_;
 };
 }  // namespace ufo_mapping
 

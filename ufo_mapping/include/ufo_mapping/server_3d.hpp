@@ -35,9 +35,7 @@ class MappingServer<3> : public rclcpp::Node
 	MappingServer(rclcpp::NodeOptions const& options = rclcpp::NodeOptions());
 
  private:
-	void insertPoints(sensor_msgs::msg::PointCloud2::SharedPtr const msg);
-
-	void insertRays(sensor_msgs::msg::PointCloud2::SharedPtr const msg);
+	void insert(sensor_msgs::msg::PointCloud2::SharedPtr const msg);
 
 	[[nodiscard]] std::optional<ufo::Transform3f> lookupTransform(
 	    std::string const& target_frame, std::string const& source_frame,
@@ -60,8 +58,7 @@ class MappingServer<3> : public rclcpp::Node
 
 	rclcpp::Publisher<ufo_interfaces::msg::Map>::SharedPtr map_pub_;
 
-	rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr insert_points_sub_;
-	rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr insert_rays_sub_;
+	rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr insert_sub_;
 };
 }  // namespace ufo_mapping
 
