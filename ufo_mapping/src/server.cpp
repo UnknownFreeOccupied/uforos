@@ -1,5 +1,3 @@
-#include <ufo_mapping/server.hpp>
-
 // UFO
 #include <ufo/cloud/point_cloud.hpp>
 
@@ -32,10 +30,15 @@ Server::Server(ros::NodeHandle& nh, ros::NodeHandle& nh_priv) : tf_listener_(tf_
 	// Publishers
 	map_pub_     = nh_priv.advertise<ufo_msgs::Map>("map", 10);
 	map_vis_pub_ = nh.advertise<visualization_msgs::MarkerArray>("map_vis", 10, true);
+
+	inverse_integrator_.min_distance = 0.1f;
+	inverse_integrator_.max_distance = 5.0f;
+	// point_integrator_.max_distance = 10.0f;
 }
 
 void Server::insertHits(sensor_msgs::PointCloud2::ConstPtr const& msg)
 {
+	// std::cout << "Points in cloud: " << msg->width * msg->height << std::endl;
 	Transform3f transform;
 	try {
 		transform =
@@ -52,12 +55,8 @@ void Server::insertHits(sensor_msgs::PointCloud2::ConstPtr const& msg)
 
 	ufo_ros::fromMsg(*msg, cloud);
 
-	transformInPlace(execution::par, transform, cloud);
-
-	integrator_.insertPoints(execution::par, *map_, cloud, false);
-
-	map_->propagateModified(execution::par);
-
+	point_integrator_(ufo::execution::par, *map_, cloud, transform, false);
+	map_->modifiedPropagate(execution::par, false);
 	publishMapVisualization(msg->header.stamp);
 }
 
@@ -79,12 +78,21 @@ void Server::insertRays(sensor_msgs::PointCloud2::ConstPtr const& msg)
 
 	ufo_ros::fromMsg(*msg, cloud);
 
-	transformInPlace(execution::par, transform, cloud);
+	static bool first = true;
+	if (first) {
+		first = false;
 
-	// TODO: enable
-	// integrator_.insertRays(execution::par, *map_, cloud, transform.translation, false);
+		std::vector<ufo::Vec2f> points;
+		points.reserve(msg->width * msg->height);
 
-	map_->propagateModified(execution::par);
+		inverse_integrator_.generateConfig(*map_, get<0>(cloud));
+	}
+
+	// transformInPlace(execution::par, transform, cloud);
+
+	inverse_integrator_(ufo::execution::par, *map_, cloud, transform, false);
+
+	map_->modifiedPropagate(execution::par, false);
 
 	publishMapVisualization(msg->header.stamp);
 }
@@ -105,7 +113,7 @@ void Server::publishMap(ros::Time timestamp)
 void Server::publishMapVisualization(ros::Time timestamp)
 {
 	if (map_vis_pub_.getNumSubscribers()) {
-		map_->propagateModified();
+		// map_->modifiedPropagate();
 
 		visualization_msgs::MarkerArray markers;
 
@@ -131,11 +139,10 @@ void Server::publishMapVisualization(ros::Time timestamp)
 		occupied_marker.frame_locked       = false;
 
 		for (auto node : map_->query(ufo::pred::Leaf() && ufo::pred::Occupied())) {
-			auto center = map_->center(node);
-			auto color  = map_->color(node);
+			Vec3f center = map_->center(node);
+			auto  color  = map_->color(node);
 
-			geometry_msgs::Point point;
-			ufo_ros::toMsg(center, point);
+			geometry_msgs::Point point = ufo_ros::toMsg(center);
 			occupied_marker.points.push_back(point);
 
 			std_msgs::ColorRGBA c;
@@ -153,6 +160,7 @@ void Server::publishMapVisualization(ros::Time timestamp)
 		if (!markers.markers.empty()) {
 			map_vis_pub_.publish(markers);
 		}
+		// std::cout << "Published viz\n";
 	}
 }
 
