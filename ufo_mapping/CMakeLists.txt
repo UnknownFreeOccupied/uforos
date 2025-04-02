@@ -14,6 +14,7 @@ find_package(tf2_ros REQUIRED)
 find_package(UFO REQUIRED COMPONENTS Map)
 find_package(ufo_interfaces REQUIRED)
 find_package(ufo_ros REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 foreach(DIM IN ITEMS 2 3)
   add_executable(server_${DIM}d src/server_node.cpp src/server_${DIM}d.cpp)
@@ -27,6 +28,7 @@ foreach(DIM IN ITEMS 2 3)
     tf2_ros
     ufo_interfaces
     ufo_ros
+    visualization_msgs
   )
 
   target_link_libraries(server_${DIM}d

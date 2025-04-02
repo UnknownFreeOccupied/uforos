@@ -9,15 +9,15 @@
 
 // STL
 #include <cstddef>
-#include <functional>
 
 // ROS
 #include <tf2/exceptions.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 
 namespace ufo_mapping
 {
 MappingServer<3>::MappingServer(rclcpp::NodeOptions const& options)
-    : rclcpp::Node("mapping_server_3d", options), map_(1.0)
+    : rclcpp::Node("mapping_server_3d", options), map_(0.1)
 {
 	map_frame_ = this->declare_parameter<std::string>("map_frame", "map_gt");
 	timeout_   = this->declare_parameter<double>("tf_timeout", 1.0);
@@ -28,14 +28,17 @@ MappingServer<3>::MappingServer(rclcpp::NodeOptions const& options)
 	map_pub_ = this->create_publisher<ufo_interfaces::msg::Map>("map", 10);
 
 	insert_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
-	    "insert", 10,
+	    "/Evolo/Lidar/MidRes", 10,
 	    [this](sensor_msgs::msg::PointCloud2::SharedPtr const msg) { insert(msg); });
 
-	bool kitti = false;
+	bool kitti = true;
+
+	inverse_integrator.count_sample_method = ufo::CountSamplingMethod::MEAN;
 
 	if (!kitti) {
-		inverse_integrator.treat_nan_as_infinity = true;
-		inverse_integrator.max_distance          = 130.0f;
+		inverse_integrator.unordered_mode = false;
+		inverse_integrator.nan_behavior   = ufo::InverseNaNBehavior::IGNORE;
+		inverse_integrator.max_distance   = 130.0f;
 
 		std::ifstream file;
 		file.exceptions(std::ifstream::badbit);
@@ -47,17 +50,22 @@ MappingServer<3>::MappingServer(rclcpp::NodeOptions const& options)
 		std::vector<ufo::Vec3f> points(size);
 		file.read(reinterpret_cast<char*>(points.data()), size * sizeof(ufo::Vec3f));
 
-		std::vector<ufo::OctCode> codes;
-		for (auto const& n : map_.query(ufo::pred::Z() < 0.01f, false, true)) {
-			codes.push_back(n.code);
-		}
+		// std::vector<ufo::OctCode> codes;
+		// for (auto const& n : map_.query(ufo::pred::Z() < 0.01f, false, true)) {
+		// 	codes.push_back(n.code);
+		// }
 
-		for (auto const& c : codes) {
-			map_.voidRegionSet(c, true, true);
-		}
+		// for (auto const& c : codes) {
+		// 	map_.voidRegionSet(c, true, true);
+		// }
 
 		for (auto& p : points) {
 			if (-10.0f > p.z) {
+				p.x = std::numeric_limits<float>::quiet_NaN();
+				p.y = std::numeric_limits<float>::quiet_NaN();
+				p.z = std::numeric_limits<float>::quiet_NaN();
+			}
+			if (0.0f == p.x && 0.0f == p.y && 0.0f == p.z) {
 				p.x = std::numeric_limits<float>::quiet_NaN();
 				p.y = std::numeric_limits<float>::quiet_NaN();
 				p.z = std::numeric_limits<float>::quiet_NaN();
@@ -74,8 +82,9 @@ MappingServer<3>::MappingServer(rclcpp::NodeOptions const& options)
 	//                                   ufo::ScanOrder::HORIZONTAL_MAJOR);
 
 	if (kitti) {
-		inverse_integrator.treat_nan_as_infinity = false;
-		inverse_integrator.max_distance          = 50.0f;
+		inverse_integrator.unordered_mode = true;
+		inverse_integrator.nan_behavior   = ufo::InverseNaNBehavior::IGNORE;
+		inverse_integrator.max_distance   = 50.0f;
 
 		double total_total_ms{};
 		double total_read_cloud_ms{};
@@ -83,15 +92,113 @@ MappingServer<3>::MappingServer(rclcpp::NodeOptions const& options)
 		double total_publish_ms{};
 		double total_propagate_ms{};
 
-		std::size_t num_clouds = 50;
-		for (std::size_t iter{}; num_clouds > iter && rclcpp::ok(); ++iter) {
+		std::filesystem::path dataset = R"(/home/dduberg/datasets/kitti/00)";
+		std::ifstream         poses(dataset / "poses.txt", std::ios::in | std::ios::binary);
+		std::ifstream calibration_fs(dataset / "calib.txt", std::ios::in | std::ios::binary);
+
+		ufo::Transform3f calibration;
+		{
+			std::string s;
+			while (std::getline(calibration_fs, s)) {
+				std::stringstream        ss(s);
+				std::vector<std::string> words;
+
+				std::string tmp;
+				while (getline(ss, tmp, ' ')) {
+					words.push_back(tmp);
+				}
+
+				if ("Tr:" == words[0]) {
+					calibration.rotation[0][0] = std::stof(words[1]);
+					calibration.rotation[1][0] = std::stof(words[2]);
+					calibration.rotation[2][0] = std::stof(words[3]);
+
+					calibration.rotation[0][1] = std::stof(words[5]);
+					calibration.rotation[1][1] = std::stof(words[6]);
+					calibration.rotation[2][1] = std::stof(words[7]);
+
+					calibration.rotation[0][2] = std::stof(words[9]);
+					calibration.rotation[1][2] = std::stof(words[10]);
+					calibration.rotation[2][2] = std::stof(words[11]);
+
+					calibration.translation[0] = std::stof(words[4]);
+					calibration.translation[1] = std::stof(words[8]);
+					calibration.translation[2] = std::stof(words[12]);
+					break;
+				}
+			}
+		}
+
+		auto calibration_inv = ufo::inverse(calibration);
+
+		std::vector<std::filesystem::path> scans;
+		for (auto const& dir_entry :
+		     std::filesystem::directory_iterator{dataset / "velodyne"}) {
+			if (dir_entry.is_regular_file()) {
+				scans.push_back(dir_entry);
+			}
+		}
+
+		std::sort(scans.begin(), scans.end());
+
+		for (std::size_t iter{}; scans.size() > iter && rclcpp::ok(); ++iter) {
 			auto const t1 = std::chrono::high_resolution_clock::now();
 
-			ufo::PointCloud<3, float, ufo::Color> cloud;
-			ufo::Transform3f                      transform;
-			ufo::readCloudUFO("/home/dduberg/ufo3/lib/viz/resources/kitti/ufo/0000_cloud.ufo",
-			                  cloud, transform);
-			transform.translation.z -= iter * 10;
+			// allocate 4 MB buffer (only ~130*4*4 KB are needed)
+			std::vector<float> data(1'000'000);
+
+			// pointers
+			float* px = data.data() + 0;
+			float* py = data.data() + 1;
+			float* pz = data.data() + 2;
+			// float* pr = data.data() + 3;
+
+			// load point cloud
+			std::FILE* stream;
+			stream   = std::fopen(scans[iter].c_str(), "rb");
+			auto num = std::fread(data.data(), sizeof(float), data.size(), stream) / 4;
+
+			ufo::PointCloud<3, float> cloud;
+			cloud.reserve(num);
+			for (std::size_t i{}; num > i; ++i) {
+				cloud.emplace_back(ufo::Vec3f{*px, *py, *pz});
+				px += 4;
+				py += 4;
+				pz += 4;
+				// pr += 4;
+			}
+			std::fclose(stream);
+
+			ufo::Transform3f transform;
+			{
+				std::string s;
+				std::getline(poses, s);
+				std::stringstream        ss(s);
+				std::vector<std::string> words;
+
+				std::string tmp;
+				while (getline(ss, tmp, ' ')) {
+					words.push_back(tmp);
+				}
+
+				transform.rotation[0][0] = std::stof(words[0]);
+				transform.rotation[1][0] = std::stof(words[1]);
+				transform.rotation[2][0] = std::stof(words[2]);
+
+				transform.rotation[0][1] = std::stof(words[4]);
+				transform.rotation[1][1] = std::stof(words[5]);
+				transform.rotation[2][1] = std::stof(words[6]);
+
+				transform.rotation[0][2] = std::stof(words[8]);
+				transform.rotation[1][2] = std::stof(words[9]);
+				transform.rotation[2][2] = std::stof(words[10]);
+
+				transform.translation[0] = std::stof(words[3]);
+				transform.translation[1] = std::stof(words[7]);
+				transform.translation[2] = std::stof(words[11]);
+
+				transform = calibration_inv * (transform * calibration);
+			}
 
 			if (0 == iter) {
 				inverse_integrator.generateConfig(map_, cloud);
@@ -140,14 +247,12 @@ MappingServer<3>::MappingServer(rclcpp::NodeOptions const& options)
 		std::cout << "[Num. nodes: " << map_.size() << "]";
 		std::cout << '\n';
 
-		--num_clouds;
-
 		std::cout << "Average:\n";
-		std::cout << "[Total: " << (total_total_ms / num_clouds) << " ms]";
-		std::cout << "[Read cloud: " << (total_read_cloud_ms / num_clouds) << " ms]";
-		std::cout << "[Integrate: " << (total_integrate_ms / num_clouds) << " ms]";
-		std::cout << "[Publish: " << (total_publish_ms / num_clouds) << " ms]";
-		std::cout << "[Propagate: " << (total_propagate_ms / num_clouds) << " ms]";
+		std::cout << "[Total: " << (total_total_ms / scans.size()) << " ms]";
+		std::cout << "[Read cloud: " << (total_read_cloud_ms / scans.size()) << " ms]";
+		std::cout << "[Integrate: " << (total_integrate_ms / scans.size()) << " ms]";
+		std::cout << "[Publish: " << (total_publish_ms / scans.size()) << " ms]";
+		std::cout << "[Propagate: " << (total_propagate_ms / scans.size()) << " ms]";
 		std::cout << "[Num. nodes: " << map_.size() << "]";
 		std::cout << '\n';
 	}
@@ -174,8 +279,8 @@ void MappingServer<3>::insert(sensor_msgs::msg::PointCloud2::SharedPtr const msg
 
 	// 	std::uint64_t size = points.size();
 	// 	file.write(reinterpret_cast<char*>(&size), sizeof(size));
-	// 	file.write(reinterpret_cast<char const*>(points.data()), size * sizeof(ufo::Vec3f));
-	// 	return;
+	// 	file.write(reinterpret_cast<char const*>(points.data()), size *
+	// sizeof(ufo::Vec3f)); 	return;
 	// }
 
 	auto transform = lookupTransform(map_frame_, msg->header.frame_id, msg->header.stamp,
@@ -192,6 +297,11 @@ void MappingServer<3>::insert(sensor_msgs::msg::PointCloud2::SharedPtr const msg
 	for (auto& p : ufo::get<0>(cloud)) {
 		auto t = transform.value()(p);
 		if (0.0f > t.z) {
+			p.x = std::numeric_limits<float>::quiet_NaN();
+			p.y = std::numeric_limits<float>::quiet_NaN();
+			p.z = std::numeric_limits<float>::quiet_NaN();
+		}
+		if (0.0f == p.x && 0.0f == p.y && 0.0f == p.z) {
 			p.x = std::numeric_limits<float>::quiet_NaN();
 			p.y = std::numeric_limits<float>::quiet_NaN();
 			p.z = std::numeric_limits<float>::quiet_NaN();
@@ -264,6 +374,67 @@ void MappingServer<3>::insert(sensor_msgs::msg::PointCloud2::SharedPtr const msg
 	dynamic_pub->publish(dynamic_msg);
 	dynamic_secondary_pub->publish(dynamic_secondary_msg);
 	static_pub->publish(static_msg);
+
+	static auto viz_pub =
+	    this->create_publisher<visualization_msgs::msg::MarkerArray>("viz", 10);
+	if (0 < viz_pub->get_subscription_count()) {
+		visualization_msgs::msg::MarkerArray markers;
+
+		// Clear all existing markers
+		visualization_msgs::msg::Marker clear_marker;
+		clear_marker.header.frame_id = map_frame_;
+		clear_marker.header.stamp    = msg->header.stamp;
+		clear_marker.action          = visualization_msgs::msg::Marker::DELETEALL;
+		markers.markers.push_back(clear_marker);
+
+		std::vector<visualization_msgs::msg::Marker> void_region_marker(
+		    map_.numDepthLevels());
+
+		for (auto node : map_.query(ufo::pred::Leaf() && ufo::pred::VoidRegion() &&
+		                            ufo::pred::Z() >= 0.01f)) {
+			auto center = map_.center(node);
+			auto depth  = map_.depth(node);
+
+			geometry_msgs::msg::Point p;
+			p.x = center.x;
+			p.y = center.y;
+			p.z = center.z;
+
+			std_msgs::msg::ColorRGBA c;
+			c.a = 1.0;
+			c.b = 0.0;
+			c.g = 1.0;
+			c.r = 0.0;
+
+			auto& vrm = void_region_marker[depth];
+			vrm.points.push_back(p);
+			vrm.colors.push_back(c);
+		}
+
+		for (std::size_t d{}; void_region_marker.size() > d; ++d) {
+			auto& vrm = void_region_marker[d];
+			if (vrm.points.empty()) {
+				continue;
+			}
+			vrm.header             = clear_marker.header;
+			vrm.id                 = d;
+			vrm.ns                 = "void_region";
+			vrm.type               = visualization_msgs::msg::Marker::CUBE_LIST;
+			vrm.action             = visualization_msgs::msg::Marker::ADD;
+			vrm.pose.orientation.w = 1.0;
+			vrm.scale.x            = map_.length(d).x;
+			vrm.scale.y            = map_.length(d).y;
+			vrm.scale.z            = map_.length(d).z;
+			vrm.color.a            = 1.0;
+			// void_region_marker.lifetime           = 0.0;  // Forever
+			vrm.frame_locked = false;
+			markers.markers.push_back(vrm);
+		}
+
+		if (!markers.markers.empty()) {
+			viz_pub->publish(markers);
+		}
+	}
 }
 
 std::optional<ufo::Transform3f> MappingServer<3>::lookupTransform(

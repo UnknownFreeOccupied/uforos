@@ -3,8 +3,6 @@
 
 // STL
 #include <cmath>
-#include <cstddef>
-#include <functional>
 
 // ROS
 #include <tf2/exceptions.hpp>
@@ -27,8 +25,8 @@ MappingServer<2>::MappingServer(rclcpp::NodeOptions const& options)
 	    rclcpp::SensorDataQoS().reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT),
 	    [this](sensor_msgs::msg::LaserScan::SharedPtr const msg) { insert(msg); });
 
-	inverse_integrator.treat_nan_as_infinity = true;
-	inverse_integrator.max_distance          = 130.0f;
+	inverse_integrator.nan_behavior = ufo::InverseNaNBehavior::IGNORE;
+	inverse_integrator.max_distance = 130.0f;
 }
 
 void MappingServer<2>::insert(sensor_msgs::msg::LaserScan::SharedPtr const msg)
@@ -42,6 +40,7 @@ void MappingServer<2>::insert(sensor_msgs::msg::LaserScan::SharedPtr const msg)
 
 		float angle = msg->angle_min;
 		for (float range : msg->ranges) {
+			(void)range;  // Not needed since we want unit (direction) vectors
 			points.emplace_back(std::cos(angle), std::sin(angle));
 			angle += msg->angle_increment;
 		}
@@ -146,7 +145,8 @@ std::optional<ufo::Transform2f> MappingServer<2>::lookupTransform(
 	try {
 		auto t = tf_buffer_->lookupTransform(target_frame, source_frame, time, timeout);
 		ufo::Transform3f tf = ufo_ros::fromMsg(t.transform);
-		return ufo::Transform2f(ufo::roll(ufo::Quat(tf.rotation)), ufo::Vec2f(tf.translation));
+		return ufo::Transform2f(ufo::roll(ufo::Quat(tf.rotation)),
+		                        ufo::Vec2f(tf.translation));
 	} catch (tf2::TransformException const& ex) {
 		RCLCPP_INFO(this->get_logger(), "Could not transform %s to %s: %s",
 		            source_frame.c_str(), target_frame.c_str(), ex.what());

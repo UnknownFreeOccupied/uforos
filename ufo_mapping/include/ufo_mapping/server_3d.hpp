@@ -3,7 +3,7 @@
 
 // UFO
 #include <ufo/map/integrator/inverse_integrator.hpp>
-#include <ufo/map/integrator/simple_integrator.hpp>
+// #include <ufo/map/integrator/simple_integrator.hpp>
 #include <ufo/map/ufomap.hpp>
 
 // UFO ROS
@@ -47,7 +47,7 @@ class MappingServer<3> : public rclcpp::Node
  private:
 	ufo::Map3D<ufo::OccupancyMap, ufo::ColorMap, ufo::VoidRegionMap> map_;
 
-	ufo::SimpleIntegrator<3>  simple_integrator;
+	// ufo::SimpleIntegrator<3>  simple_integrator;
 	ufo::InverseIntegrator<3> inverse_integrator;
 
 	// TF
