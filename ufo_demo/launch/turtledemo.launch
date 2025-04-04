@@ -27,8 +27,9 @@
     <arg name="resolution" value="0.05" />
     <arg name="depth_levels" value="17" />
     <arg name="frame_id" value="map" />
-    <arg name="insert_hits" value="/camera/depth/points"/>
-    <!-- <arg name="insert_rays" value="/camera/depth/points"/> -->
+    <arg name="max_distance" value="5" />
+    <!-- <arg name="insert_hits" value="/camera/depth/points"/> -->
+    <arg name="insert_rays" value="/camera/depth/points"/>
   </include>
 
   <!-- RViz -->

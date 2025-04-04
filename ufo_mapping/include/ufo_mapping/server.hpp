@@ -6,7 +6,7 @@
 #include <ufo/map/color/map.hpp>
 // #include <ufo/map/integrator/simple_integrator.hpp>
 #include <ufo/map/integrator/inverse_integrator.hpp>
-#include <ufo/map/integrator/point_integrator.hpp>
+// #include <ufo/map/integrator/point_integrator.hpp>
 #include <ufo/map/occupancy/map.hpp>
 #include <ufo/map/ufomap.hpp>
 
@@ -50,7 +50,7 @@ class Server
 	// ufo::Integrator                     integrator_;
 	// ufo::SimpleIntegrator<3> simple_integrator_;
 	ufo::InverseIntegrator<3> inverse_integrator_;
-	ufo::PointIntegrator<3> point_integrator_;
+	// ufo::PointIntegrator<3> point_integrator_;
 
 	float map_resolution_  = 0.05f;
 	int   map_depthlevels_ = 17;

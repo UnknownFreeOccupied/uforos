@@ -1,3 +1,5 @@
+#include <ufo_mapping/server.hpp>
+
 // UFO
 #include <ufo/cloud/point_cloud.hpp>
 
@@ -20,6 +22,10 @@ Server::Server(ros::NodeHandle& nh, ros::NodeHandle& nh_priv) : tf_listener_(tf_
 	nh_priv.getParam("map_resolution_m", map_resolution_);
 	nh_priv.getParam("map_depth_levels", map_depthlevels_);
 	nh_priv.getParam("map_frame_id", frame_id_);
+	double min_distance = 0.0f;
+	nh_priv.getParam("min_distance", min_distance);
+	double max_distance = std::numeric_limits<double>::infinity();
+	nh_priv.getParam("max_distance", max_distance);
 
 	map_ = new Map3D<OccupancyMap, ColorMap>(map_resolution_, map_depthlevels_);
 
@@ -31,8 +37,8 @@ Server::Server(ros::NodeHandle& nh, ros::NodeHandle& nh_priv) : tf_listener_(tf_
 	map_pub_     = nh_priv.advertise<ufo_msgs::Map>("map", 10);
 	map_vis_pub_ = nh.advertise<visualization_msgs::MarkerArray>("map_vis", 10, true);
 
-	inverse_integrator_.min_distance = 0.1f;
-	inverse_integrator_.max_distance = 5.0f;
+	inverse_integrator_.min_distance = min_distance;
+	inverse_integrator_.max_distance = max_distance;
 	// point_integrator_.max_distance = 10.0f;
 }
 
@@ -55,7 +61,7 @@ void Server::insertHits(sensor_msgs::PointCloud2::ConstPtr const& msg)
 
 	ufo_ros::fromMsg(*msg, cloud);
 
-	point_integrator_(ufo::execution::par, *map_, cloud, transform, false);
+	// point_integrator_(ufo::execution::par, *map_, cloud, transform, false);
 	map_->modifiedPropagate(execution::par, false);
 	publishMapVisualization(msg->header.stamp);
 }
