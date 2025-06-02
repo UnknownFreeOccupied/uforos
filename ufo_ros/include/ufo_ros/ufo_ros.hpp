@@ -148,6 +148,18 @@ template <class T = float>
 	return ufo::Transform3<T>(fromMsg<T>(msg.orientation), fromMsg<T>(msg.position));
 }
 
+inline bool hasField(sensor_msgs::msg::PointCloud2 const& msg,
+                     std::string const&                   field_name)
+{
+	for (auto const& field : msg.fields) {
+		// std::cout << "field: " << field.name << '\n';
+		if (field.name == field_name) {
+			return true;
+		}
+	}
+	return false;
+}
+
 template <std::size_t Dim, class T, class... Rest>
 void fromMsg(sensor_msgs::msg::PointCloud2 const& msg,
              ufo::PointCloud<Dim, T, Rest...>&    out)
@@ -175,24 +187,58 @@ void fromMsg(sensor_msgs::msg::PointCloud2 const& msg,
 	if constexpr (ufo::contains_type_v<ufo::Color, Rest...>) {
 		// TODO: Add check if color exists and if alpha exists
 
-		sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_r(msg, "r");
-		sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_g(msg, "g");
-		sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_b(msg, "b");
-		sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_a(msg, "a");
+		bool has_r = hasField(msg, "r");
+		bool has_g = hasField(msg, "g");
+		bool has_b = hasField(msg, "b");
 
-		for (auto& c : ufo::get<ufo::Color>(out)) {
-			c.red   = *iter_r;
-			c.green = *iter_g;
-			c.blue  = *iter_b;
-			c.alpha = *iter_a;
-			++iter_r;
-			++iter_g;
-			++iter_b;
-			++iter_a;
+		if (hasField(msg, "rgba") || (has_r && has_g && has_b && hasField(msg, "a"))) {
+			sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_r(msg, "r");
+			sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_g(msg, "g");
+			sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_b(msg, "b");
+			sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_a(msg, "a");
+			for (auto& c : ufo::get<ufo::Color>(out)) {
+				c.red   = *iter_r;
+				c.green = *iter_g;
+				c.blue  = *iter_b;
+				c.alpha = *iter_a;
+				++iter_r;
+				++iter_g;
+				++iter_b;
+				++iter_a;
+			}
+		} else if (hasField(msg, "rgb") || (has_r && has_g && has_b)) {
+			sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_r(msg, "r");
+			sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_g(msg, "g");
+			sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_b(msg, "b");
+			for (auto& c : ufo::get<ufo::Color>(out)) {
+				c.red   = *iter_r;
+				c.green = *iter_g;
+				c.blue  = *iter_b;
+				c.alpha = 255;  // Default alpha value
+				++iter_r;
+				++iter_g;
+				++iter_b;
+			}
 		}
 	}
 
 	// TODO: Implement
+
+	if constexpr (ufo::contains_type_v<ufo::Label, Rest...>) {
+		if (hasField(msg, "l")) {
+			sensor_msgs::PointCloud2ConstIterator<ufo::label_t> iter_l(msg, "l");
+			for (auto& l : ufo::get<ufo::Label>(out)) {
+				l = *iter_l;
+				++iter_l;
+			}
+		} else if (hasField(msg, "label")) {
+			sensor_msgs::PointCloud2ConstIterator<ufo::label_t> iter_l(msg, "label");
+			for (auto& l : ufo::get<ufo::Label>(out)) {
+				l = *iter_l;
+				++iter_l;
+			}
+		}
+	}
 }
 
 template <std::size_t Dim, class T = float, class... Ts>
