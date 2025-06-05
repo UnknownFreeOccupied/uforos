@@ -25,8 +25,8 @@ MappingServer<2>::MappingServer(rclcpp::NodeOptions const& options)
 	    rclcpp::SensorDataQoS().reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT),
 	    [this](sensor_msgs::msg::LaserScan::SharedPtr const msg) { insert(msg); });
 
-	inverse_integrator.nan_behavior = ufo::InverseNaNBehavior::IGNORE;
-	inverse_integrator.max_distance = 130.0f;
+	// inverse_integrator.nan_behavior = ufo::InverseNaNBehavior::IGNORE;
+	angular_integrator.max_distance = 130.0f;
 }
 
 void MappingServer<2>::insert(sensor_msgs::msg::LaserScan::SharedPtr const msg)
@@ -45,7 +45,7 @@ void MappingServer<2>::insert(sensor_msgs::msg::LaserScan::SharedPtr const msg)
 			angle += msg->angle_increment;
 		}
 
-		inverse_integrator.generateConfig(map_, points);
+		// inverse_integrator.generateConfig(map_, points);
 	}
 
 	auto transform = lookupTransform(map_frame_, msg->header.frame_id, msg->header.stamp,
@@ -61,22 +61,22 @@ void MappingServer<2>::insert(sensor_msgs::msg::LaserScan::SharedPtr const msg)
 	float angle = msg->angle_min;
 	for (float range : msg->ranges) {
 		if (msg->range_min > range || msg->range_max < range || std::isnan(range)) {
-			cloud.push_back(ufo::Vec2f(std::numeric_limits<float>::quiet_NaN(),
-			                           std::numeric_limits<float>::quiet_NaN()));
+			cloud.emplace_back(ufo::Vec2f(std::numeric_limits<float>::quiet_NaN(),
+			                              std::numeric_limits<float>::quiet_NaN()));
 		} else {
-			cloud.push_back(ufo::Vec2f(range * std::cos(angle), range * std::sin(angle)));
+			cloud.emplace_back(ufo::Vec2f(range * std::cos(angle), range * std::sin(angle)));
 		}
 		angle += msg->angle_increment;
 	}
 	auto const t2 = std::chrono::high_resolution_clock::now();
 
-	inverse_integrator(ufo::execution::par, map_, cloud, transform.value(), false);
+	angular_integrator(ufo::execution::par, map_, cloud, transform.value());
 	auto const t3 = std::chrono::high_resolution_clock::now();
 
 	publishUpdate(msg->header.stamp);
 	auto const t4 = std::chrono::high_resolution_clock::now();
 
-	map_.modifiedPropagate(ufo::execution::par, false);
+	map_.propagate(ufo::execution::par);
 	auto const t5 = std::chrono::high_resolution_clock::now();
 
 	std::chrono::duration<double, std::milli> const total_ms     = t5 - t1;
@@ -101,18 +101,18 @@ void MappingServer<2>::insert(sensor_msgs::msg::LaserScan::SharedPtr const msg)
 	// 	static_cloud.push_back(ufo::cast<float>(5.0 * p));
 	// }
 
-	for (auto const& p : ufo::get<0>(cloud)) {
+	for (auto const& p : cloud.view<0>()) {
 		if (isnan(p)) {
 			continue;
 		}
 
 		auto t_p = transform.value()(p);
 		if (map_.voidRegion(t_p)) {
-			dynamic_cloud.push_back(ufo::Vec3f(t_p, 0.0f));
-		} else if (map_.voidRegionSecondary(t_p)) {
-			dynamic_secondary_cloud.push_back(ufo::Vec3f(t_p, 0.0f));
+			dynamic_cloud.emplace_back(ufo::Vec3f(t_p, 0.0f));
+			// } else if (map_.voidRegionSecondary(t_p)) {
+			// 	dynamic_secondary_cloud.push_back(ufo::Vec3f(t_p, 0.0f));
 		} else {
-			static_cloud.push_back(ufo::Vec3f(t_p, 0.0f));
+			static_cloud.emplace_back(ufo::Vec3f(t_p, 0.0f));
 		}
 	}
 

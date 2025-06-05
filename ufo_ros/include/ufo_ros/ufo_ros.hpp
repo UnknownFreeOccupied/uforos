@@ -35,7 +35,7 @@ namespace ufo_ros
 {
 /**************************************************************************************
 |                                                                                     |
-|                                      From msg                                       |
+|                                        From                                         |
 |                                                                                     |
 **************************************************************************************/
 
@@ -57,9 +57,9 @@ namespace ufo_ros
 	res.num_depth_levels = msg.num_depth_levels;
 	res.num_blocks       = msg.num_blocks;
 	res.num_nodes        = msg.num_nodes;
-	res.map_info.resize(msg.map.size());
+	res.map_info.reserve(msg.map.size());
 	for (std::size_t i{}; msg.map.size() > i; ++i) {
-		res.map_info[i] = fromMsg(msg.map[i]);
+		res.map_info.push_back(fromMsg(msg.map[i]));
 	}
 	return res;
 }
@@ -152,7 +152,9 @@ template <std::size_t Dim, class T, class... Rest>
 void fromMsg(sensor_msgs::msg::PointCloud2 const& msg,
              ufo::PointCloud<Dim, T, Rest...>&    out)
 {
+	std::cerr << "Before resize\n";
 	out.resize(msg.height * msg.width);
+	std::cerr << "After resize\n";
 
 	if (out.empty()) {
 		return;
@@ -161,7 +163,8 @@ void fromMsg(sensor_msgs::msg::PointCloud2 const& msg,
 	sensor_msgs::PointCloud2ConstIterator<T> iter_x(msg, "x");
 	sensor_msgs::PointCloud2ConstIterator<T> iter_y(msg, "y");
 	sensor_msgs::PointCloud2ConstIterator<T> iter_z(msg, "z");
-	for (auto& p : ufo::get<0>(out)) {
+	auto                                     points = out.template view<0>();
+	for (auto& p : points) {
 		p.x = *iter_x;
 		++iter_x;
 		p.y = *iter_y;
@@ -178,17 +181,18 @@ void fromMsg(sensor_msgs::msg::PointCloud2 const& msg,
 		sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_r(msg, "r");
 		sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_g(msg, "g");
 		sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_b(msg, "b");
-		sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_a(msg, "a");
+		// sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_a(msg, "a");
 
-		for (auto& c : ufo::get<ufo::Color>(out)) {
+		auto colors = out.template view<ufo::Color>();
+		for (auto& c : colors) {
 			c.red   = *iter_r;
 			c.green = *iter_g;
 			c.blue  = *iter_b;
-			c.alpha = *iter_a;
+			// c.alpha = *iter_a;
 			++iter_r;
 			++iter_g;
 			++iter_b;
-			++iter_a;
+			// ++iter_a;
 		}
 	}
 
@@ -220,8 +224,9 @@ template <class... Ts>
 
 // float angle = msg->angle_min;
 // for (float range : msg->ranges) {
-// 	if (msg->range_min > range || msg->range_max < range || std::isnan(range)) {
-// 		res.push_back(out_of_range_to_nan ? std::numeric_limits<float>::quiet_NaN() : )
+// 	if (msg->range_min > range || msg->range_max < range ||
+// std::isnan(range)) { 		res.push_back(out_of_range_to_nan ?
+// std::numeric_limits<float>::quiet_NaN() : )
 // 	}
 // 	// TODO: Implement
 // }
@@ -231,7 +236,7 @@ template <class... Ts>
 
 /**************************************************************************************
 |                                                                                     |
-|                                       To msg                                        |
+|                                         To                                          |
 |                                                                                     |
 **************************************************************************************/
 
@@ -343,7 +348,7 @@ template <std::size_t Dim, class T, class... Rest>
 	}
 
 	sensor_msgs::PointCloud2Iterator<float> iter_x(res, "x");
-	for (auto const& p : ufo::get<0>(a)) {
+	for (auto const& p : a.template view<0>()) {
 		iter_x[0] = static_cast<float>(p.x);
 		iter_x[1] = static_cast<float>(p.y);
 		if constexpr (3 <= Dim) {
@@ -357,7 +362,7 @@ template <std::size_t Dim, class T, class... Rest>
 	if constexpr (ufo::contains_type_v<ufo::Color, Rest...>) {
 		sensor_msgs::PointCloud2Iterator<std::uint8_t> iter_r(res, "r");
 
-		for (auto const& c : ufo::get<ufo::Color>(a)) {
+		for (auto const& c : a.template view<ufo::Color>()) {
 			iter_r[0] = static_cast<std::uint8_t>(c.red);
 			iter_r[1] = static_cast<std::uint8_t>(c.green);
 			iter_r[2] = static_cast<std::uint8_t>(c.blue);

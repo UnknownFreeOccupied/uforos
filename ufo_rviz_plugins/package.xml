@@ -15,6 +15,7 @@
   <depend>rviz_rendering</depend>
   <depend>ufo</depend>
   <depend>ufo_interfaces</depend>
+  <depend>ufo_ros</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

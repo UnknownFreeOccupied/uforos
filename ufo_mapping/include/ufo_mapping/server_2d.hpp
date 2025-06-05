@@ -2,7 +2,8 @@
 #define UFO_MAPPING_SERVER_2D_HPP
 
 // UFO
-#include <ufo/map/integrator/inverse_integrator.hpp>
+#include <ufo/map/integrator/angular_integrator.hpp>
+// #include <ufo/map/integrator/inverse_integrator.hpp>
 // #include <ufo/map/integrator/simple_integrator.hpp>
 #include <ufo/map/ufomap.hpp>
 
@@ -49,8 +50,9 @@ class MappingServer<2> : public rclcpp::Node
  private:
 	ufo::Map2D<ufo::OccupancyMap, ufo::ColorMap, ufo::VoidRegionMap> map_;
 
+	ufo::AngularIntegrator<2> angular_integrator;
 	// ufo::SimpleIntegrator<2>  simple_integrator;
-	ufo::InverseIntegrator<2> inverse_integrator;
+	// ufo::InverseIntegrator<2> inverse_integrator;
 
 	// TF
 	std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};

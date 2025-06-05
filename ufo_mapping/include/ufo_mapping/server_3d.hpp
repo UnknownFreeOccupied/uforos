@@ -2,7 +2,8 @@
 #define UFO_MAPPING_SERVER_3D_HPP
 
 // UFO
-#include <ufo/map/integrator/inverse_integrator.hpp>
+#include <ufo/map/integrator/angular_integrator.hpp>
+// #include <ufo/map/integrator/inverse_integrator.hpp>
 // #include <ufo/map/integrator/simple_integrator.hpp>
 #include <ufo/map/ufomap.hpp>
 
@@ -12,6 +13,7 @@
 #include <ufo_ros/ufo_ros.hpp>
 
 // STL
+#include <future>
 #include <memory>
 #include <optional>
 
@@ -37,6 +39,9 @@ class MappingServer<3> : public rclcpp::Node
  private:
 	void insert(sensor_msgs::msg::PointCloud2::SharedPtr const msg);
 
+	void insert(ufo::PointCloud<3, float, ufo::Color> const& cloud,
+	            ufo::Transform<3, float> const& transform, rclcpp::Time const& time);
+
 	[[nodiscard]] std::optional<ufo::Transform3f> lookupTransform(
 	    std::string const& target_frame, std::string const& source_frame,
 	    rclcpp::Time const&     time,
@@ -46,9 +51,13 @@ class MappingServer<3> : public rclcpp::Node
 
  private:
 	ufo::Map3D<ufo::OccupancyMap, ufo::ColorMap, ufo::VoidRegionMap> map_;
+	// ufo::MapFull3D<ufo::MapUtility::WITH_CENTER, ufo::OccupancyMap, ufo::ColorMap,
+	//                ufo::VoidRegionMap>
+	//     map_;
 
+	ufo::AngularIntegrator<3> angular_integrator;
 	// ufo::SimpleIntegrator<3>  simple_integrator;
-	ufo::InverseIntegrator<3> inverse_integrator;
+	// ufo::InverseIntegrator<3> inverse_integrator;
 
 	// TF
 	std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
@@ -59,6 +68,8 @@ class MappingServer<3> : public rclcpp::Node
 	rclcpp::Publisher<ufo_interfaces::msg::Map>::SharedPtr map_pub_;
 
 	rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr insert_sub_;
+
+	std::future<void> something_;
 };
 }  // namespace ufo_mapping
 

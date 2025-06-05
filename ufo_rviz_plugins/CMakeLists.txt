@@ -19,6 +19,7 @@ find_package(rviz_common REQUIRED)
 find_package(rviz_rendering REQUIRED)
 find_package(UFO REQUIRED COMPONENTS Map Plan)
 find_package(ufo_interfaces REQUIRED)
+find_package(ufo_ros REQUIRED)
 
 set(CMAKE_AUTOMOC ON)
 
@@ -38,6 +39,7 @@ ament_target_dependencies(map_display
   rclcpp
   rviz_common
   ufo_interfaces
+  ufo_ros
 )
 
 target_link_libraries(map_display
@@ -60,6 +62,7 @@ ament_target_dependencies(nav_map_display
   rclcpp
   rviz_common
   ufo_interfaces
+  ufo_ros
 )
 
 target_link_libraries(nav_map_display
@@ -80,6 +83,8 @@ install(DIRECTORY include/
 install(FILES ufo_rviz_plugins.xml
   DESTINATION share/${PROJECT_NAME}
 )
+
+register_rviz_ogre_media_exports(DIRECTORIES "ogre_media")
 
 ament_export_include_directories(include)
 
