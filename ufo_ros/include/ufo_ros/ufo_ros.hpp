@@ -270,7 +270,7 @@ template <class... Ts>
 }
 
 template <class Map, class Predicate = ufo::pred::Leaf,
-          std::enable_if_t<ufo::pred::is_pred_v<Predicate, Map>, bool> = true>
+          std::enable_if_t<ufo::pred::is_pred_v<Predicate>, bool> = true>
 [[nodiscard]] ufo_interfaces::msg::Map toMsg(Map const&       a,
                                              Predicate const& pred  = ufo::pred::Leaf{},
                                              ufo::MapType map_types = ufo::MapType::ALL)
