@@ -26,6 +26,7 @@
 #include <geometry_msgs/msg/quaternion.hpp>
 #include <geometry_msgs/msg/transform.hpp>
 #include <geometry_msgs/msg/vector3.hpp>
+#include <rclcpp/logging.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/point_cloud2_iterator.hpp>
@@ -148,13 +149,31 @@ template <class T = float>
 	return ufo::Transform3<T>(fromMsg<T>(msg.orientation), fromMsg<T>(msg.position));
 }
 
+inline bool hasField(sensor_msgs::msg::PointCloud2 const& msg,
+                     std::string const&                   field_name)
+{
+	auto field_it =
+	    std::find_if(msg.fields.begin(), msg.fields.end(),
+	                 [&field_name](auto const& f) { return f.name == field_name; });
+	return field_it != msg.fields.end();
+}
+
+template <typename T, typename Labels>
+void fillLabels(sensor_msgs::msg::PointCloud2 const& msg, std::string const& field_name,
+                Labels& labels)
+{
+	sensor_msgs::PointCloud2ConstIterator<T> iter(msg, field_name);
+	for (auto& l : labels) {
+		l.label = static_cast<ufo::label_t>(*iter);
+		++iter;
+	}
+}
+
 template <std::size_t Dim, class T, class... Rest>
 void fromMsg(sensor_msgs::msg::PointCloud2 const& msg,
              ufo::PointCloud<Dim, T, Rest...>&    out)
 {
-	std::cerr << "Before resize\n";
 	out.resize(msg.height * msg.width);
-	std::cerr << "After resize\n";
 
 	if (out.empty()) {
 		return;
@@ -176,26 +195,76 @@ void fromMsg(sensor_msgs::msg::PointCloud2 const& msg,
 	}
 
 	if constexpr (ufo::contains_type_v<ufo::Color, Rest...>) {
-		// TODO: Add check if color exists and if alpha exists
+		bool has_r = hasField(msg, "r");
+		bool has_g = hasField(msg, "g");
+		bool has_b = hasField(msg, "b");
 
-		sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_r(msg, "r");
-		sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_g(msg, "g");
-		sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_b(msg, "b");
-		// sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_a(msg, "a");
-
-		auto colors = out.template view<ufo::Color>();
-		for (auto& c : colors) {
-			c.red   = *iter_r;
-			c.green = *iter_g;
-			c.blue  = *iter_b;
-			// c.alpha = *iter_a;
-			++iter_r;
-			++iter_g;
-			++iter_b;
-			// ++iter_a;
+		if (hasField(msg, "rgba") || (has_r && has_g && has_b && hasField(msg, "a"))) {
+			sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_r(msg, "r");
+			sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_g(msg, "g");
+			sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_b(msg, "b");
+			sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_a(msg, "a");
+			auto colors = out.template view<ufo::Color>();
+			for (auto& c : colors) {
+				c.red   = *iter_r;
+				c.green = *iter_g;
+				c.blue  = *iter_b;
+				c.alpha = *iter_a;
+				++iter_r;
+				++iter_g;
+				++iter_b;
+				++iter_a;
+			}
+		} else if (hasField(msg, "rgb") || (has_r && has_g && has_b)) {
+			sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_r(msg, "r");
+			sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_g(msg, "g");
+			sensor_msgs::PointCloud2ConstIterator<ufo::Color::value_type> iter_b(msg, "b");
+			auto colors = out.template view<ufo::Color>();
+			for (auto& c : colors) {
+				c.red   = *iter_r;
+				c.green = *iter_g;
+				c.blue  = *iter_b;
+				c.alpha = 255;  // Default alpha value
+				++iter_r;
+				++iter_g;
+				++iter_b;
+			}
+		} else {
+			RCLCPP_WARN(rclcpp::get_logger("ufo_ros"),
+			            "PointCloud2 message does not contain expected color fields (rgb/rgba "
+			            "or r/g/b/a).");
 		}
 	}
 
+	if constexpr (ufo::contains_type_v<ufo::Label, Rest...>) {
+		auto field_it =
+		    std::find_if(msg.fields.begin(), msg.fields.end(),
+		                 [&](auto const& f) { return f.name == "l" || f.name == "label"; });
+
+		if (field_it != msg.fields.end()) {
+			auto labels = out.template view<ufo::Label>();
+
+			switch (field_it->datatype) {
+				case sensor_msgs::msg::PointField::UINT8:
+					fillLabels<std::uint8_t>(msg, field_it->name, labels);
+					break;
+				case sensor_msgs::msg::PointField::UINT16:
+					fillLabels<std::uint16_t>(msg, field_it->name, labels);
+					break;
+				case sensor_msgs::msg::PointField::UINT32:
+					fillLabels<std::uint32_t>(msg, field_it->name, labels);
+					break;
+				default:
+					RCLCPP_WARN(rclcpp::get_logger("ufo_ros"),
+					            "Unsupported label field type in PointCloud2 message. Expected "
+					            "UINT8, UINT16, or UINT32.");
+					break;
+			}
+		} else {
+			RCLCPP_WARN(rclcpp::get_logger("ufo_ros"),
+			            "PointCloud2 message does not contain a label field ('l' or 'label').");
+		}
+	}
 	// TODO: Implement
 }
 
