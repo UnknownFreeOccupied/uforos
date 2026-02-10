@@ -158,9 +158,9 @@ inline bool hasField(sensor_msgs::msg::PointCloud2 const& msg,
 	return field_it != msg.fields.end();
 }
 
-template <typename T>
+template <typename T, typename Labels>
 void fillLabels(sensor_msgs::msg::PointCloud2 const& msg, std::string const& field_name,
-                auto& labels)
+                Labels& labels)
 {
 	sensor_msgs::PointCloud2ConstIterator<T> iter(msg, field_name);
 	for (auto& l : labels) {
